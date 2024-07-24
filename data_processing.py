@@ -9,3 +9,5 @@ def process_data(x, mu, cov, d):
     orthonormal_frame = left_singular_vectors[:, :, 0:d]
     observed_projection = torch.bmm(orthonormal_frame, orthonormal_frame.mT)
     return x, mu, cov, observed_projection
+
+

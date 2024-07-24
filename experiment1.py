@@ -15,20 +15,21 @@ surface = "paraboloid"
 num_pts = 30
 num_test = 100
 seed = 17
+bd_epsilon = 0.5
 # Encoder region and quiver length
 alpha = -1
 beta = 1
 # Regularization: contract and tangent
-contractive_weight = 0.01
+contractive_weight = 0.001
 tangent_bundle_weight = 1.
 lr = 0.001
-epochs = 20000
+epochs = 50000
 print_freq = 1000
-weight_decay = 0.001
+weight_decay = 0.01
 # Network structure
 extrinsic_dim = 3
 intrinsic_dim = 2
-h1 = [32, 32]
+h1 = [64, 64]
 encoder_act = nn.Tanh()
 decoder_act = nn.Tanh()
 if seed is not None:
@@ -42,13 +43,13 @@ if surface in surface_bounds:
     # Set the bounds from the dictionary
     bounds = surface_bounds[surface]
     # Set large_bounds (if needed)
-    large_bounds = [(b[0] - 0.5, b[1] + 0.5) for b in bounds]
+    large_bounds = [(b[0] - bd_epsilon, b[1] + bd_epsilon) for b in bounds]
 else:
     raise ValueError("Invalid surface")
 
 # Initialize the manifold and choose the dynamics
 manifold = RiemannianManifold(local_coordinates, chart)
-true_drift = manifold.local_bm_drift()
+true_drift = manifold.local_bm_drift() + manifold.metric_tensor().inv() * double_well_potential
 true_diffusion = manifold.local_bm_diffusion()
 
 # Initialize the point cloud

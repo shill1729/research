@@ -2,11 +2,13 @@
 # Fit the SDEs
 from experiment1 import *
 
-diffusion_epochs = 90000
-drift_epochs = 90000
+diffusion_epochs = 10000
+drift_epochs = 10000
 normal_bundle_weight = 0.01
-h2 = [64, 64]
-h3 = [64, 64]
+h2 = [32, 32]
+h3 = [32, 32]
+matrix_norm = "fro"
+normalize = False
 drift_act = nn.Tanh()
 diffusion_act = nn.Tanh()
 final_coef_act = None
@@ -33,10 +35,11 @@ plt.show()
 # Define SDEs
 latent_sde = LatentNeuralSDE(intrinsic_dim, h2, h3, drift_act, diffusion_act, final_coef_act)
 model_diffusion = AutoEncoderDiffusion(latent_sde, ctbae)
-diffusion_loss = DiffusionLoss(normal_bundle_weight)
-dpi = ctbae.encoder.jacobian_network(x)
+diffusion_loss = DiffusionLoss(normal_bundle_weight, norm=matrix_norm, normalize=normalize)
+dpi = ctbae.encoder.jacobian_network(x).detach()
 encoded_cov = torch.bmm(torch.bmm(dpi, cov), dpi.mT)
-fit_model(model_diffusion, diffusion_loss, x, (cov, mu, encoded_cov), lr, diffusion_epochs, print_freq, weight_decay)
+fit_model(model_diffusion, diffusion_loss, x, (cov, mu, encoded_cov), lr, diffusion_epochs,
+          print_freq, weight_decay)
 # Fit drift
 toggle_model(model_diffusion.latent_sde.diffusion_net, False)
 model_drift = AutoEncoderDrift(latent_sde, ctbae)
@@ -52,11 +55,12 @@ def compute_losses(x, mu, cov, P):
     contraction = ContractiveRegularization()
     ctbae_loss_test = CTBAELoss(contractive_weight, tangent_bundle_weight, P)
     x_test_reconstructed, dpi, P_model = ctbae(x)
+    encoded_cov = torch.bmm(torch.bmm(dpi, cov), dpi.mT).detach()
     mse = mse_loss(x, x_test_reconstructed).item()
     tb_loss = tbloss.forward(P_model, P).item()
     contraction_value = contraction.forward(dpi).item()
     ctbae_loss_test_value = ctbae_loss_test(ctbae(x), x).item()
-    covariance_loss = CovarianceMSELoss()
+    covariance_loss = CovarianceMSELoss(norm=matrix_norm)
     normal_bundle_loss = NormalBundleLoss()
     model_mu_test = model_drift(x)
     model_cov, N, q, bbt = model_diffusion.forward(x)
@@ -64,7 +68,7 @@ def compute_losses(x, mu, cov, P):
     normal_proj_vector = torch.bmm(N, tangent_vector.unsqueeze(2))
     normal_bundle_loss_value = normal_bundle_loss(normal_proj_vector).item()
     cov_mse_loss = covariance_loss.forward(model_cov, cov).item()
-    total_diffusion_loss = diffusion_loss.forward(model_diffusion(x), (cov, mu, None)).item()
+    total_diffusion_loss = diffusion_loss.forward(model_diffusion(x), (cov, mu, encoded_cov)).item()
     drift_mse = drift_loss.forward(model_mu_test, mu).item()
     # print("Test Reconstruction Error = " + str(mse))
     # print("Test Tangent Bundle Error = " + str(tb_loss))
