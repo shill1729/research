@@ -1,13 +1,17 @@
-# Load in the CTBAE
+# Load in the CCTBAE
 # Fit the SDEs
-from experiment1 import *
+import matplotlib.pyplot as plt
 
+from experiment1 import *
+from shillml.localnsde import LatentNeuralSDE, AutoEncoderDrift, AutoEncoderDiffusion
+from shillml.losses import DiffusionLoss, DriftMSELoss, TangentBundleLoss, ContractiveRegularization
+from shillml.losses import CovarianceMSELoss, NormalBundleLoss, CurvatureCTBAELoss
 diffusion_epochs = 10000
-drift_epochs = 10000
+drift_epochs = 50000
 normal_bundle_weight = 0.01
 h2 = [32, 32]
 h3 = [32, 32]
-matrix_norm = "fro"
+matrix_norm = "nuc"
 normalize = False
 drift_act = nn.Tanh()
 diffusion_act = nn.Tanh()
@@ -21,15 +25,21 @@ def load_model_weights(model, file_path):
 
 
 # Usage
-ctbae = ContractiveTangentBundleAutoEncoder(extrinsic_dim, intrinsic_dim, h1, encoder_act, decoder_act)
-ctbae = load_model_weights(ctbae, f"plots/{surface}/autoencoder/ctbae.pth")
+ctbae = CurvatureCTBAutoEncoder(extrinsic_dim, intrinsic_dim, h1, encoder_act, decoder_act)
+ctbae = load_model_weights(ctbae, f"plots/{surface}/autoencoder/curve_ae.pth")
+# z = ctbae.encoder(x_extrap)
+# dpi = ctbae.encoder.jacobian_network(x_extrap)
+# dphi = ctbae.decoder.jacobian_network(z)
+# icheck = torch.bmm(dpi, dphi)
+# print(icheck)
+
 # Make sure the AE is frozen
 toggle_model(ctbae, False)
 # Check to see if we have our autoencoder
 fig = plt.figure()
 ax = fig.add_subplot(111, projection="3d")
 ax.scatter3D(x[:, 0], x[:, 1], x[:, 2])
-ctbae.plot_surface(alpha, beta, 30, ax, "CTBAE")
+ctbae.plot_surface(alpha, beta, 30, ax, "CCTBAE")
 plt.show()
 
 # Define SDEs
@@ -53,13 +63,14 @@ def compute_losses(x, mu, cov, P):
     mse_loss = nn.MSELoss()
     tbloss = TangentBundleLoss()
     contraction = ContractiveRegularization()
-    ctbae_loss_test = CTBAELoss(contractive_weight, tangent_bundle_weight, P)
-    x_test_reconstructed, dpi, P_model = ctbae(x)
+    # ctbae_loss_test = CTBAELoss(contractive_weight, tangent_bundle_weight, P)
+    ctbae_loss_test = CurvatureCTBAELoss(contractive_weight, tangent_bundle_weight, curvature_weight, P)
+    x_test_reconstructed, dpi, P_model, hessian_decoder = ctbae(x)
     encoded_cov = torch.bmm(torch.bmm(dpi, cov), dpi.mT).detach()
     mse = mse_loss(x, x_test_reconstructed).item()
     tb_loss = tbloss.forward(P_model, P).item()
     contraction_value = contraction.forward(dpi).item()
-    ctbae_loss_test_value = ctbae_loss_test(ctbae(x), x).item()
+    ctbae_loss_test_value = ctbae_loss_test(ctbae(x), (x, mu, cov)).item()
     covariance_loss = CovarianceMSELoss(norm=matrix_norm)
     normal_bundle_loss = NormalBundleLoss()
     model_mu_test = model_drift(x)
@@ -151,3 +162,15 @@ print(latex_table)
 os.makedirs(f"plots/{surface}/ctbae_sde", exist_ok=True)
 with open(f"plots/{surface}/ctbae_sde/error_table.tex", "w") as f:
     f.write(latex_table)
+
+mu_model = model_drift.forward(x_extrap).detach()
+x_extrap = x_extrap.detach()
+mu_extrap = mu_extrap.detach()
+
+fig = plt.figure()
+ax = plt.subplot(111, projection="3d")
+ax.quiver(x_extrap[:, 0], x_extrap[:, 1], x_extrap[:, 2], mu_extrap[:, 0], mu_extrap[:, 1], mu_extrap[:, 2],
+          normalize=True, length=0.25)
+ax.quiver(x_extrap[:, 0], x_extrap[:, 1], x_extrap[:, 2], mu_model[:, 0], mu_model[:, 1], mu_model[:, 2],
+          normalize=True, length=0.25, color="red", alpha=0.5)
+plt.show()

@@ -2,34 +2,38 @@
 import os
 
 import matplotlib.pyplot as plt
+import torch
 
 from shillml.diffgeo import RiemannianManifold
-from shillml.dynae import *
+from shillml.autoencoders import *
+from shillml.losses import CAELoss, TBAELoss, CTBAELoss, CurvatureCTBAELoss, fit_model
 from shillml.newptcld import PointCloud
 
 from data_processing import process_data
 from sde_coefficients import *
 from surfaces import *
 
-surface = "paraboloid"
+surface = "hyperbolic_paraboloid"
 num_pts = 30
 num_test = 100
 seed = 17
 bd_epsilon = 0.5
+
 # Encoder region and quiver length
 alpha = -1
 beta = 1
 # Regularization: contract and tangent
 contractive_weight = 0.001
-tangent_bundle_weight = 1.
-lr = 0.001
-epochs = 50000
+tangent_bundle_weight = 0.001
+curvature_weight = 0.0001
+lr = 0.0001
+epochs = 30000
 print_freq = 1000
-weight_decay = 0.01
+weight_decay = 0.
 # Network structure
 extrinsic_dim = 3
 intrinsic_dim = 2
-h1 = [64, 64]
+h1 = [128, 128]
 encoder_act = nn.Tanh()
 decoder_act = nn.Tanh()
 if seed is not None:
@@ -49,8 +53,10 @@ else:
 
 # Initialize the manifold and choose the dynamics
 manifold = RiemannianManifold(local_coordinates, chart)
-true_drift = manifold.local_bm_drift() + manifold.metric_tensor().inv() * double_well_potential
-true_diffusion = manifold.local_bm_diffusion()
+# true_drift = manifold.local_bm_drift() + manifold.metric_tensor().inv() * double_well_potential
+# true_diffusion = manifold.local_bm_diffusion() * diffusion_circular
+true_drift = drift_zero
+true_diffusion = diffusion_identity
 
 # Initialize the point cloud
 point_cloud = PointCloud(manifold, bounds=bounds, local_drift=true_drift, local_diffusion=true_diffusion)
@@ -63,7 +69,7 @@ x_interp, mu_interp, cov_interp, P_interp = process_data(x_interp, mu_interp, co
 
 # Extrapolation testing point cloud
 point_cloud = PointCloud(manifold, bounds=large_bounds, local_drift=true_drift, local_diffusion=true_diffusion)
-x_extrap, _, mu_extrap, cov_extrap, _ = point_cloud.generate(n=num_pts, seed=None)
+x_extrap, _, mu_extrap, cov_extrap, _ = point_cloud.generate(n=num_test, seed=None)
 x_extrap, mu_extrap, cov_extrap, P_extrap = process_data(x_extrap, mu_extrap, cov_extrap, d=intrinsic_dim)
 
 # Define models
@@ -71,42 +77,59 @@ ae = AutoEncoder(extrinsic_dim, intrinsic_dim, h1, encoder_act, decoder_act)
 cae = ContractiveAutoEncoder(extrinsic_dim, intrinsic_dim, h1, encoder_act, decoder_act)
 tbae = TangentBundleAutoEncoder(extrinsic_dim, intrinsic_dim, h1, encoder_act, decoder_act)
 ctbae = ContractiveTangentBundleAutoEncoder(extrinsic_dim, intrinsic_dim, h1, encoder_act, decoder_act)
+curve_ae = CurvatureCTBAutoEncoder(extrinsic_dim, intrinsic_dim, h1, encoder_act, decoder_act)
 # Define the loss functions for each auto encoder
 mse_loss = nn.MSELoss()
 cae_loss = CAELoss(contractive_weight)
 tbae_loss = TBAELoss(tangent_bundle_weight, P)
 ctbae_loss = CTBAELoss(contractive_weight, tangent_bundle_weight, P)
-
+curve_loss = CurvatureCTBAELoss(contractive_weight, tangent_bundle_weight, curvature_weight, P)
 # Run the program.
 if __name__ == "__main__":
     fit_model(ae, mse_loss, x, x, lr, epochs, print_freq, weight_decay)
     fit_model(cae, cae_loss, x, x, lr, epochs, print_freq, weight_decay)
     fit_model(tbae, tbae_loss, x, x, lr, epochs, print_freq, weight_decay)
     fit_model(ctbae, ctbae_loss, x, x, lr, epochs, print_freq, weight_decay)
+    fit_model(curve_ae, curve_loss, x, (x, mu, cov), lr, epochs, print_freq, weight_decay)
 
     # Compute interpolation error:
     tbae_loss = TBAELoss(tangent_bundle_weight, P_interp)
     ctbae_loss = CTBAELoss(contractive_weight, tangent_bundle_weight, P_interp)
+    curve_loss = CurvatureCTBAELoss(contractive_weight, tangent_bundle_weight, curvature_weight, P_interp)
     interpolation_error_ae = mse_loss.forward(ae.forward(x_interp), x_interp).item()
     interpolation_error_cae = cae_loss.forward(cae.forward(x_interp), x_interp)
     interpolation_error_tbae = tbae_loss.forward(tbae.forward(x_interp), x_interp)
     interpolation_error_ctbae = ctbae_loss.forward(ctbae.forward(x_interp), x_interp)
+    interpolation_error_curve_ae = curve_loss.forward(curve_ae.forward(x_interp),
+                                                      (x_interp, mu_interp, cov_interp))
+
     # Compute extrapolation error:
     tbae_loss = TBAELoss(tangent_bundle_weight, P_extrap)
     ctbae_loss = CTBAELoss(contractive_weight, tangent_bundle_weight, P_extrap)
+    curve_loss = CurvatureCTBAELoss(contractive_weight, tangent_bundle_weight, curvature_weight, P_extrap)
     extrapolation_error_ae = mse_loss.forward(ae.forward(x_extrap), x_extrap).item()
     extrapolation_error_cae = cae_loss.forward(cae.forward(x_extrap), x_extrap)
     extrapolation_error_tbae = tbae_loss.forward(tbae.forward(x_extrap), x_extrap)
     extrapolation_error_ctbae = ctbae_loss.forward(ctbae.forward(x_extrap), x_extrap)
+    extrapolation_error_curve_ae = curve_loss.forward(curve_ae.forward(x_extrap),
+                                                      (x_extrap, mu_extrap, cov_extrap))
 
+    interp_diffeo_error = [model.compute_diffeo_error(x_interp).detach() for model in [ae, cae, tbae, ctbae, curve_ae]]
+    extrap_diffeo_error = [model.compute_diffeo_error(x_extrap).detach() for model in [ae, cae, tbae, ctbae, curve_ae]]
+    print("Interpolation diffeo error")
+    print(interp_diffeo_error)
+    print("Extrapolation diffeo error")
+    print(extrap_diffeo_error)
     # After calculating all errors
     # Create a dictionary to store all errors
     errors = {
         "AE": {"Interpolation": interpolation_error_ae, "Extrapolation": extrapolation_error_ae},
         "CAE": {"Interpolation": interpolation_error_cae, "Extrapolation": extrapolation_error_cae},
         "TBAE": {"Interpolation": interpolation_error_tbae, "Extrapolation": extrapolation_error_tbae},
-        "CTBAE": {"Interpolation": interpolation_error_ctbae, "Extrapolation": extrapolation_error_ctbae}
+        "CTBAE": {"Interpolation": interpolation_error_ctbae, "Extrapolation": extrapolation_error_ctbae},
+        "CurveAE": {"Interpolation": interpolation_error_curve_ae, "Extrapolation": extrapolation_error_curve_ae}
     }
+
 
     # Print errors to console
     print("\nErrors:")
@@ -135,6 +158,7 @@ if __name__ == "__main__":
     caption += f"Weight decay: {weight_decay}. "
     caption += f"Contractive weight: {contractive_weight}. "
     caption += f"Tangent bundle weight: {tangent_bundle_weight}. "
+    caption += f"Curvature weight: {curvature_weight}. "
     caption += f"Training region bounds: {bounds}. "
     caption += f"Extrapolation region bounds: {large_bounds}. "
     caption += f"Number of training points: {num_pts}. "
@@ -152,25 +176,30 @@ if __name__ == "__main__":
     # Optionally, save LaTeX table to a file
     with open(f"plots/{surface}/autoencoder/error_table.tex", "w") as f:
         f.write(latex_table)
-    torch.save(ctbae.state_dict(), f"plots/{surface}/autoencoder/ctbae.pth")
+    torch.save(curve_ae.state_dict(), f"plots/{surface}/autoencoder/curve_ae.pth")
 
     # Detach for plots!
     x = x.detach()
+    x_extrap = x_extrap.detach()
     # Comparing the four AEs
     fig = plt.figure()
-    ax = fig.add_subplot(2, 2, 1, projection="3d")
-    ax.scatter3D(x[:, 0], x[:, 1], x[:, 2])
+    ax = fig.add_subplot(2, 3, 1, projection="3d")
+    ax.scatter3D(x_extrap[:, 0], x_extrap[:, 1], x_extrap[:, 2])
     ae.plot_surface(alpha, beta, 30, ax, "AE")
 
-    ax = fig.add_subplot(2, 2, 2, projection="3d")
-    ax.scatter3D(x[:, 0], x[:, 1], x[:, 2])
+    ax = fig.add_subplot(2, 3, 2, projection="3d")
+    ax.scatter3D(x_extrap[:, 0], x_extrap[:, 1], x_extrap[:, 2])
     cae.plot_surface(alpha, beta, 30, ax, "CAE")
 
-    ax = fig.add_subplot(2, 2, 3, projection="3d")
-    ax.scatter3D(x[:, 0], x[:, 1], x[:, 2])
+    ax = fig.add_subplot(2, 3, 3, projection="3d")
+    ax.scatter3D(x_extrap[:, 0], x_extrap[:, 1], x_extrap[:, 2])
     tbae.plot_surface(alpha, beta, 30, ax, "TBAE")
 
-    ax = fig.add_subplot(2, 2, 4, projection="3d")
-    ax.scatter3D(x[:, 0], x[:, 1], x[:, 2])
+    ax = fig.add_subplot(2, 3, 4, projection="3d")
+    ax.scatter3D(x_extrap[:, 0], x_extrap[:, 1], x_extrap[:, 2])
     ctbae.plot_surface(alpha, beta, 30, ax, "CTBAE")
+
+    ax = fig.add_subplot(2, 3, 5, projection="3d")
+    ax.scatter3D(x_extrap[:, 0], x_extrap[:, 1], x_extrap[:, 2])
+    curve_ae.plot_surface(alpha, beta, 30, ax, "CCTBAE")
     plt.show()

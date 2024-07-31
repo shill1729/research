@@ -5,15 +5,15 @@ u, v = sp.symbols(names="u v", real=True)
 # R, r = sp.symbols(names="R r", positive=True)
 # c1, c2 = sp.symbols(names="c1 c2", positive=True)
 # sd = sp.symbols('sd', positive=True)
-c1 = 10
-c2 = 10
+c1 = 2
+c2 = 2
 R = 2
 r = 1
 sd = 5
 # First, define a dictionary with just the bounds
 surface_bounds = {
     'quartic': [(-1, 1), (-1, 1)],
-    'paraboloid': [(-2, 2), (-2, 2)],
+    'paraboloid': [(-1, 1), (-1, 1)],
     'sphere': [(0, np.pi), (0, 2 * np.pi)],
     'torus': [(0, 2 * np.pi), (0, 2 * np.pi)],
     'gaussian_bump': [(-3, 3), (-3, 3)],
