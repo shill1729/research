@@ -6,12 +6,12 @@ from experiment1 import *
 from shillml.localnsde import LatentNeuralSDE, AutoEncoderDrift, AutoEncoderDiffusion
 from shillml.losses import DiffusionLoss, DriftMSELoss, TangentBundleLoss, ContractiveRegularization
 from shillml.losses import CovarianceMSELoss, NormalBundleLoss, CurvatureCTBAELoss
-diffusion_epochs = 10000
-drift_epochs = 50000
+diffusion_epochs = 20000
+drift_epochs = 20000
 normal_bundle_weight = 0.01
 h2 = [32, 32]
-h3 = [32, 32]
-matrix_norm = "nuc"
+h3 = [64, 64]
+matrix_norm = "fro"
 normalize = False
 drift_act = nn.Tanh()
 diffusion_act = nn.Tanh()
@@ -26,7 +26,7 @@ def load_model_weights(model, file_path):
 
 # Usage
 ctbae = CurvatureCTBAutoEncoder(extrinsic_dim, intrinsic_dim, h1, encoder_act, decoder_act)
-ctbae = load_model_weights(ctbae, f"plots/{surface}/autoencoder/curve_ae.pth")
+ctbae = load_model_weights(ctbae, f"plots/{surface}/autoencoder/curve2_ae.pth")
 # z = ctbae.encoder(x_extrap)
 # dpi = ctbae.encoder.jacobian_network(x_extrap)
 # dphi = ctbae.decoder.jacobian_network(z)
@@ -170,7 +170,7 @@ mu_extrap = mu_extrap.detach()
 fig = plt.figure()
 ax = plt.subplot(111, projection="3d")
 ax.quiver(x_extrap[:, 0], x_extrap[:, 1], x_extrap[:, 2], mu_extrap[:, 0], mu_extrap[:, 1], mu_extrap[:, 2],
-          normalize=True, length=0.25)
+          normalize=True, length=0.15)
 ax.quiver(x_extrap[:, 0], x_extrap[:, 1], x_extrap[:, 2], mu_model[:, 0], mu_model[:, 1], mu_model[:, 2],
-          normalize=True, length=0.25, color="red", alpha=0.5)
+          normalize=True, length=0.15, color="red", alpha=0.5)
 plt.show()

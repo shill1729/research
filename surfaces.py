@@ -5,8 +5,8 @@ u, v = sp.symbols(names="u v", real=True)
 # R, r = sp.symbols(names="R r", positive=True)
 # c1, c2 = sp.symbols(names="c1 c2", positive=True)
 # sd = sp.symbols('sd', positive=True)
-c1 = 2
-c2 = 2
+c1 = 5
+c2 = 5
 R = 2
 r = 1
 sd = 5
