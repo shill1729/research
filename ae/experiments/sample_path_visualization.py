@@ -1,4 +1,4 @@
-# We visualize the true sample paths against hte model on the neural surface
+# We visualize the true sample paths against the model on the neural surface
 if __name__ == "__main__":
     import torch
     import torch.nn as nn
@@ -14,11 +14,11 @@ if __name__ == "__main__":
     from ae.models.autoencoder import AutoEncoder
     from ae.models.local_neural_sdes import LatentNeuralSDE, AutoEncoderDiffusion
     # Loss imports
-    from ae.models.losses import LossWeights
+    from ae.models.losses import LossWeights, TotalLoss, LocalDiffusionLoss, LocalDriftLoss
     # Pre-training/traing and performance imports
     from ae.utils import process_data
     from ae.models.fitting import ThreeStageFit
-    from ae.utils.performance_analysis import plot_tangent_planes
+    from ae.utils.performance_analysis import plot_tangent_planes, compute_test_losses
 
     # Inputs
     device = torch.device("cpu")
@@ -34,16 +34,16 @@ if __name__ == "__main__":
     # Offset the boundary for point cloud
     epsilon = 0.01
     extrinsic_dim, intrinsic_dim = 3, 2
-    hidden_dims = [16, 16]
+    hidden_dims = [16]
     diffusion_layers = [16]
     drift_layers = [16]
     lr = 0.001
     weight_decay = 0.
     # EPOCHS FOR TRAINING
-    epochs_ae = 1000
-    epochs_diffusion = 1000
-    epochs_drift = 1000
-    batch_size = 5
+    epochs_ae = 2000
+    epochs_diffusion = 2000
+    epochs_drift = 2000
+    batch_size = 15
     print_freq = 100
     # PATHS PARAMETERS
     ntime = 1000
@@ -118,10 +118,41 @@ if __name__ == "__main__":
                                                                                 d=intrinsic_dim,
                                                                                 return_frame=True,
                                                                                 device=device)
+
+    # Print post-training losses on the testing set for the AE
+    print("\nTesting-set losses for the Autoencoder:")
+    ae_loss = TotalLoss(weights, norm)
+    diffusion_loss = LocalDiffusionLoss(norm)
+    drift_loss = LocalDriftLoss()
+    test_ae_losses = compute_test_losses(ae_diffusion,
+                                         ae_loss,
+                                         x_test,
+                                         p_test,
+                                         orthonormal_frame_test,
+                                         cov_test,
+                                         mu_test,
+                                         device=device)
+    for key, value in test_ae_losses.items():
+        print(f"{key} = {value:.4f}")
+
+    # Compute diffusion losses for testing set:
+    dpi_test = ae.encoder.jacobian_network(x_test).detach()
+    encoded_cov_test = torch.bmm(torch.bmm(dpi_test, cov_test), dpi_test.mT)
+    diffusion_loss_test = diffusion_loss.forward(ae_diffusion=ae_diffusion,
+                                                 x=x_test,
+                                                 encoded_cov=encoded_cov_test
+                                                 )
+    drift_loss_test = drift_loss.forward(ae_diffusion=ae_diffusion,
+                                         x=x_test,
+                                         observed_ambient_drift=mu_test)
+    print("\nSDE losses")
+    print("Diffusion extrapolation loss = " + str(diffusion_loss_test.detach().numpy()))
+    print("Drift extrapolation loss = " + str(drift_loss_test.detach().numpy()))
+
+    # Plot tangent spaces
     x_test_hat = ae_diffusion.autoencoder.forward(x_test).detach()
     Hmodel = ae_diffusion.autoencoder.compute_orthonormal_frame(x_test).detach()
-    plot_tangent_planes(x_test, x_test_hat, orthonormal_frame_test, Hmodel, resolution=8)
-
+    plot_tangent_planes(x_test.detach(), x_test_hat, orthonormal_frame_test, Hmodel, resolution=8)
 
     # Plot SDEs
     z0_true = x[0, :2].detach()
@@ -131,8 +162,6 @@ if __name__ == "__main__":
     model_latent_paths = latent_sde.sample_paths(z0, tn, ntime, npaths)
     true_ambient_paths = np.zeros((npaths, ntime + 1, extrinsic_dim))
     model_ambient_paths = np.zeros((npaths, ntime + 1, extrinsic_dim))
-    print(true_ambient_paths.shape)
-    print(true_latent_paths.shape)
     for j in range(npaths):
         model_ambient_paths[j, :, :] = ae.decoder(
             torch.tensor(model_latent_paths[j, :, :], dtype=torch.float32)).detach().numpy()

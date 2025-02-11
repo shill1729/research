@@ -24,8 +24,8 @@ if __name__ == "__main__":
 
     n_trials = 1
     # Point cloud sample parameters
-    n_train = 10
-    n_test = 30
+    n_train = 30
+    n_test = 100
     training_seed = 17
     eps = 0.05
 
@@ -33,24 +33,24 @@ if __name__ == "__main__":
     extrinsic_dim = 3
     intrinsic_dim = 2
     # Same amount of neurons for every network
-    hidden_layers = [2]
-    drift_layers = [2]
-    diffusion_layers = [2]
+    hidden_layers = [8]
+    drift_layers = [8]
+    diffusion_layers = [8]
     encoder_act = nn.Tanh()
     decoder_act = nn.Tanh()
     drift_act = nn.Tanh()
     diffusion_act = nn.Tanh()
     norm = "fro"
     # Penalty coefficients for non-vanilla AEs:
-    tangent_angle_weight = 0.
-    tangent_drift_weight = 0.
+    tangent_angle_weight = 0.05
+    tangent_drift_weight = 0.05
     diffeo_weight = 0.
     # Training parameters:
     lr = 0.001
-    epochs_ae = 2
-    epochs_diffusion = 2
-    epochs_drift = 2
-    print_freq = 1
+    epochs_ae = 1000
+    epochs_diffusion = 1000
+    epochs_drift = 1000
+    print_freq = 500
     weight_decay = 0.
     batch_size = int(n_train / 2)
 
@@ -236,10 +236,9 @@ if __name__ == "__main__":
                     print("\nTrial = " + str(n))
                     fit3 = ThreeStageFit(lr, epochs_ae, epochs_diffusion, epochs_drift, weight_decay, batch_size,
                                          print_freq)
-                    model = fit3.three_stage_fit(model, weights, x, mu, cov, P, H)
+                    # Does this update the models in the 'models' list?
+                    fit3.three_stage_fit(model, weights, x, mu, cov, P, H)
                     # Done training
-                    # diffusion_models.append(model.latent_sde)
-                    # drift_models.append(model_drift)
                     i += 1
 
                 # Evaluate interpolation and extrapolation
