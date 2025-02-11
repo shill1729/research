@@ -4,8 +4,8 @@ import sympy as sp
 import matplotlib.pyplot as plt
 
 from sympy import Matrix, MutableDenseNDimArray
-from sde_cas import matrix_divergence
-from sdes import SDE
+from ae.symbolic.sde_cas import matrix_divergence
+from ae.sdes.sdes import SDE
 
 
 class RiemannianManifold:

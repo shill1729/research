@@ -1,10 +1,9 @@
 import sympy as sp
 from typing import Tuple, List
-from sdes import SDE
-from sampler import ImportanceSampler
-from diffgeo import RiemannianManifold
+from ae.sdes.sdes import SDE
+from ae.toydata.sampler import ImportanceSampler
+from ae.symbolic.diffgeo import RiemannianManifold
 from matplotlib.patches import Ellipse
-import matplotlib.pyplot as plt
 import numpy as np
 
 
@@ -368,7 +367,7 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
     import numpy as np
     import sympy as sp
-    from diffgeo import RiemannianManifold
+    from ae.symbolic.diffgeo import RiemannianManifold
 
     tn = 1
     ntime = 1000
