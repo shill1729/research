@@ -7,7 +7,7 @@ def parse_requirements(filename):
 
 
 setup(
-    name='ae',
+    name='research',
     version='0.1',
     packages=find_packages(include=["ae", "ae.*"]),
     exclude_package_data={"": ["experiments/*"]},
