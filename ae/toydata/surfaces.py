@@ -65,7 +65,7 @@ class Cylinder(SurfaceBase):
 
 
 class WaveSurface(SurfaceBase):
-    def __init__(self, amplitude=1.0, frequency_u=1.0, frequency_v=1.0, phase=0.0):
+    def __init__(self, amplitude=1.0, frequency_u=1.0, frequency_v=0.0, phase=0.0):
         super().__init__()
         self.amplitude = amplitude
         self.frequency_u = frequency_u
