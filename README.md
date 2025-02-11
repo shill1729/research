@@ -9,7 +9,7 @@ This is a package for a penalized autoencoder project.
 You can install the package via from GitHub on windows/mac in command line with:
 
 ``` 
-python -m pip install git+https://github.com/shill1729/research/ae.git
+python -m pip install git+https://github.com/shill1729/research.git
 ```
 
 ## Features
