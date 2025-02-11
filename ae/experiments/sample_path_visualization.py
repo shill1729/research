@@ -14,11 +14,11 @@ if __name__ == "__main__":
     from ae.models.autoencoder import AutoEncoder
     from ae.models.local_neural_sdes import LatentNeuralSDE, AutoEncoderDiffusion
     # Loss imports
-    from ae.models.losses import LocalDriftLoss, LocalDiffusionLoss, TotalLoss, LossWeights
+    from ae.models.losses import LossWeights
     # Pre-training/traing and performance imports
-    from ae.utils import process_data, set_grad_tracking
-    from ae.models.fitting import fit_model, ThreeStageFit
-    from ae.performance_analysis import compute_test_losses, plot_tangent_planes
+    from ae.utils import process_data
+    from ae.models.fitting import ThreeStageFit
+    from ae.utils.performance_analysis import plot_tangent_planes
 
     # Inputs
     device = torch.device("cpu")

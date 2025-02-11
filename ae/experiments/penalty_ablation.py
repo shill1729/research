@@ -10,19 +10,17 @@ if __name__ == "__main__":
     import pandas as pd
     import os
     import numpy as np
-    from scipy.stats import ttest_ind
-    from datetime import datetime
 
     from ae.symbolic.diffgeo import RiemannianManifold
     from ae.toydata.pointclouds import PointCloud
     from ae.models.autoencoder import AutoEncoder
     from ae.models.local_neural_sdes import LatentNeuralSDE, AutoEncoderDiffusion
     from ae.models.losses import TotalLoss, LossWeights, LocalDriftLoss, LocalDiffusionLoss
-    from ae.utils import select_device, set_grad_tracking, process_data
+    from ae.utils import process_data
     from ae.toydata.surfaces import *
     from ae.toydata.local_dynamics import *
-    from ae.performance_analysis import compute_test_losses
-    from ae.models.fitting import fit_model, ThreeStageFit
+    from ae.utils.performance_analysis import compute_test_losses
+    from ae.models.fitting import ThreeStageFit
 
     n_trials = 1
     # Point cloud sample parameters
