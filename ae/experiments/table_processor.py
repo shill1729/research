@@ -65,5 +65,6 @@ def process_csv_folder(input_folder, output_folder):
     print(f"Processed all CSV files in {input_folder} and saved LaTeX tables to {output_folder}")
 
 
-# Example usage
-process_csv_folder("experiment_results/ProductSurface/extrap", "output_latex_folder")
+if __name__ == "__main__":
+    # Example usage
+    process_csv_folder("experiment_results/ProductSurface/extrap", "output_latex_folder")
