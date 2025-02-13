@@ -449,8 +449,7 @@ class RiemannianManifold:
 
         fig = plt.figure(figsize=(12, 8))
         ax = fig.add_subplot(111, projection='3d')
-
-        surface = ax.plot_surface(X, Y, Z, cmap='viridis', alpha=0.8)
+        surface = ax.plot_surface(X[0], Y[0], Z[0], cmap='viridis', alpha=0.1)
 
         ax.set_xlabel('X')
         ax.set_ylabel('Y')

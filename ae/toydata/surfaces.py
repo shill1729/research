@@ -148,7 +148,7 @@ class Sphere(SurfaceBase):
         ])
 
     def bounds(self):
-        return [(np.pi / 3, np.pi), (0, 2 * np.pi)]
+        return [(0, np.pi), (0, 2 * np.pi)]
 
 
 class QuarticMinusCubic(SurfaceBase):

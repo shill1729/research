@@ -10,7 +10,21 @@
 """
 
 import torch
+import numpy as np
 from torch import nn
+
+
+def compute_orthogonal_projection_from_cov(cov, d=2):
+    """
+
+    :param cov: the ambient covariance
+    :param d: the intrinsic dimension
+    :return: a DxD matrix representing the orthogonal projection onto the d-dimensional tangent space
+    """
+    left_singular_vectors = np.linalg.svd(cov)[0]
+    orthonormal_frame = left_singular_vectors[:, :, 0:d]
+    observed_projection = np.matmul(orthonormal_frame, orthonormal_frame.transpose(0, 2, 1))
+    return observed_projection
 
 
 def process_data(x, mu, cov, d, return_frame=True, device="cpu"):

@@ -382,7 +382,7 @@ class TotalLoss(nn.Module):
             total_loss += self.weights.tangent_drift_weight * drift_alignment_loss
         # Diffeomorphism regularization
         if self.weights.diffeomorphism_reg > 0:
-            diffeomorphism_loss1 = self.diffeomorphism_reg1(decoder_jacobian, encoder_jacobian)
+            diffeomorphism_loss1 = self.diffeomorphism_reg(decoder_jacobian, encoder_jacobian)
             total_loss += self.weights.diffeomorphism_reg * diffeomorphism_loss1
         if self.weights.tangent_angle_weight > 0:
             total_loss += self.weights.tangent_angle_weight * self.tangent_angles_reg.forward(observed_frame,
