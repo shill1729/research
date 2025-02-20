@@ -239,3 +239,4 @@ def test_surface_intersection(surface_pts, A_matrices=None, eps=1.0, ax=None):
 if __name__ == '__main__':
     test_three_points_on_circle()
     test_riemannian_manifold()
+

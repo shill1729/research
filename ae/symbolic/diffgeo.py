@@ -135,9 +135,9 @@ class RiemannianManifold:
         Returns:
             Matrix: The local Brownian motion drift.
         """
-        print("Inverting metric tensor...")
+        # print("Inverting metric tensor...")
         g_inv = sp.simplify(self.metric_tensor().inv())
-        print("Computing manifold divergence of g^{-1}...")
+        # print("Computing manifold divergence of g^{-1}...")
         return sp.simplify(self.manifold_divergence(g_inv) / 2)
 
     def local_bm_diffusion(self, method: str = "pow") -> Matrix:
@@ -360,9 +360,9 @@ class RiemannianManifold:
         return sp.lambdify(self.local_coordinates, expr, modules='numpy')
 
     def create_local_bm_sde(self) -> SDE:
-        print("Computing local drift...")
+        # print("Computing local drift...")
         mu = self.sympy_to_numpy(self.local_bm_drift())
-        print("Computing local diffusion...")
+        # print("Computing local diffusion...")
         sigma = self.sympy_to_numpy(self.local_bm_diffusion())
 
         def drift(t, x):

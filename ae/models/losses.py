@@ -7,6 +7,66 @@ from typing import Tuple
 
 from ae.models.autoencoder import AutoEncoder
 from ae.models.local_neural_sdes import ambient_quadratic_variation_drift, AutoEncoderDiffusion
+from ae.models.ambient_sdes import AmbientDiffusionNetwork, AmbientDriftNetwork
+
+
+class AmbientDriftLoss(nn.Module):
+    """
+        Compute the mean square error between two matrices under any matrix-norm.
+    """
+
+    def __init__(self, *args, **kwargs):
+        """
+            Compute the mean square error between two matrices under any matrix-norm.
+
+        :param args:
+        :param kwargs:
+        """
+        super().__init__(*args, **kwargs)
+
+    def forward(self, model: AmbientDriftNetwork, input_data: Tensor, target: Tensor) -> Tensor:
+        """
+            Compute the mean square error between two matrices under any matrix-norm.
+
+        :param model: AmbientDriftNetwork
+        :param input_data: tensor of shape (n, a, b)
+        :param target: tensor of shape (n, a, b)
+        :return: tensor of shape (1, ).
+        """
+        model_output = model.forward(input_data)
+        square_error = torch.linalg.vector_norm(model_output - target, ord=2, dim=1) ** 2
+        mse = torch.mean(square_error)
+        return mse
+
+
+class AmbientDiffusionLoss(nn.Module):
+    """
+        Compute the mean square error between two matrices under any matrix-norm.
+    """
+
+    def __init__(self, *args, **kwargs):
+        """
+            Compute the mean square error between two matrices under any matrix-norm.
+
+        :param args:
+        :param kwargs:
+        """
+        super().__init__(*args, **kwargs)
+
+    def forward(self, model: AmbientDiffusionNetwork, input_data: Tensor, target: Tensor) -> Tensor:
+        """
+            Compute the mean square error between two matrices under any matrix-norm.
+
+        :param model: AmbientDiffusionNetwork
+        :param input_data: tensor of shape (n, a, b)
+        :param target: tensor of shape (n, a, b)
+        :return: tensor of shape (1, ).
+        """
+        model_output = model.forward(input_data)
+        model_output = torch.bmm(model_output, model_output.mT)
+        square_error = torch.linalg.matrix_norm(model_output - target, ord="fro") ** 2
+        mse = torch.mean(square_error)
+        return mse
 
 
 class TangentSpaceAnglesLoss(nn.Module):
@@ -27,8 +87,8 @@ class TangentSpaceAnglesLoss(nn.Module):
         gframe = torch.bmm(evecs, torch.bmm(inv_sqrt_evals, evecs.mT))
         model_frame = torch.bmm(decoder_jacobian, gframe)
         a = torch.bmm(observed_frame.mT, model_frame)
-        sigma_sq_sum = torch.linalg.matrix_norm(a, ord="fro")**2
-        loss = 2*torch.mean(d-sigma_sq_sum)
+        sigma_sq_sum = torch.linalg.matrix_norm(a, ord="fro") ** 2
+        loss = 2 * torch.mean(d - sigma_sq_sum)
         return loss
 
 

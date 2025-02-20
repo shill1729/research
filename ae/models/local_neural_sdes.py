@@ -139,5 +139,11 @@ class AutoEncoderDiffusion(nn.Module):
         mu_model = tangent_drift + 0.5 * q
         return mu_model
 
+    def compute_ambient_covariance(self, x: Tensor) -> Tensor:
+        z, dphi, b, q = self.compute_sde_manifold_tensors(x)
+        bbt = torch.bmm(b, b.mT)
+        cov_model = torch.bmm(dphi, torch.bmm(bbt, dphi.mT))
+        return cov_model
+
 
 
