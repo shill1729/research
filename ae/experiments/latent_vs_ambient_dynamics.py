@@ -42,36 +42,36 @@ if __name__ == "__main__":
 
     # The intrinsic and extrinsic dimensions.
     extrinsic_dim, intrinsic_dim = 3, 2
-    hidden_dims = [16, 2, 16]
-    diffusion_layers = [16]
-    drift_layers = [16]
+    hidden_dims = [64]
+    diffusion_layers = [2]
+    drift_layers = [2]
     lr = 0.001
     weight_decay = 0.
-    epochs_ae = 8000
-    epochs_diffusion = 8000
-    epochs_drift = 8000
+    epochs_ae = 9000
+    epochs_diffusion = 9000
+    epochs_drift = 9000
     print_freq = 500
-    tangent_angle_weight = 0.002
-    tangent_drift_weight = 0.001
-    diffeo_weight = 0.01
+    tangent_angle_weight = 0.03
+    tangent_drift_weight = 0.03
+    diffeo_weight = 0.1
     encoder_act = nn.Tanh()
     decoder_act = nn.Tanh()
     drift_act = nn.Tanh()
     diffusion_act = nn.Tanh()
     npaths = 5
-    ntime = 8000
+    ntime = 5000
     tn = 5.
 
     # -------------------------------------
     # CHOOSE THE SURFACE AND GET THE BOUNDS
     # -------------------------------------
-    surface = WaveSurface()
+    surface = RationalSurface()
     bounds = surface.bounds()  # native bounds in the local coordinates
     # For testing, we will enlarge these bounds by ε.
 
     # Initialize the manifold and dynamics.
     manifold = RiemannianManifold(surface.local_coords(), surface.equation())
-    dynamics = LangevinHarmonicOscillator()
+    dynamics = LangevinDoubleWell()
     local_drift = dynamics.drift(manifold)
     local_diffusion = dynamics.diffusion(manifold)
 

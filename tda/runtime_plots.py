@@ -29,7 +29,7 @@ def generate_point_cloud_and_As(n, seed=17):
         eigenvalues, eigenvectors = np.linalg.eigh(p[i])
         s = np.diag(eigenvalues)
         sn = np.zeros((3, 3))
-        sn[0, 0] = 9.0
+        sn[0, 0] = 2.
         a[i] = eigenvectors.T @ (s + sn) @ eigenvectors
     A_list = [a[i] for i in range(n)]
     return x, A_list
@@ -102,11 +102,11 @@ def plot_runtime_vs_n(n_values, pair_times, triple_times, solvers, log=False):
 def main():
     eps = 0.5
     # Define a list of n values. Be cautious: triple tests scale as O(n^3)
-    n_values = [10, 15, 20, 30, 40, 50]
-
-    solvers = ["SLSQP"]
-    pair_times = np.zeros((len(n_values), 2))
-    triple_times = np.zeros((len(n_values), 2))
+    n_values = [5, 10, 15, 20]
+    # The only relevant ones are SLSQP, trust_constr, and COB-...
+    solvers = ["L-BFGS-B","SLSQP", "CS"]
+    pair_times = np.zeros((len(n_values), len(solvers)))
+    triple_times = np.zeros((len(n_values), len(solvers)))
     print("Measuring runtimes for intersection tests:")
     for j, solver in enumerate(solvers):
         print(solver)

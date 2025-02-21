@@ -66,7 +66,7 @@ def plot_ellipsoid_3d(ax, center, A, eps, color='b', alpha=0.2, wireframe=True):
 # -------------------------------
 # Empirical Timing and Plotting Functions
 # -------------------------------
-def empirical_intersections_plot_pairs(points, A_list, manifold, surface, eps=0.5, max_plots=6):
+def empirical_intersections_plot_pairs(points, A_list, manifold, surface, eps=0.5, max_plots=6, solver="SLSQP"):
     """
     Loop over every pair of points and their corresponding A matrices,
     time the intersection test (via minimize_K),
@@ -86,7 +86,7 @@ def empirical_intersections_plot_pairs(points, A_list, manifold, surface, eps=0.
 
         # Put start-time, end-time surrounding this
         start_time = time.perf_counter()
-        result = minimize_K(eps, pts, A_list=As)
+        result = minimize_K(eps, pts, A_list=As, solver=solver)
         end_time = time.perf_counter()
         print("Total minimizer time (including inverting A) = "+str(end_time-start_time))
 
@@ -135,7 +135,7 @@ def empirical_intersections_plot_pairs(points, A_list, manifold, surface, eps=0.
         plt.show()
 
 
-def empirical_intersections_plot_triples(points, A_list, manifold, surface, eps=0.5, max_plots=6):
+def empirical_intersections_plot_triples(points, A_list, manifold, surface, eps=0.5, max_plots=6, solver="SLSQP"):
     """
     Loop over every triple of points and their corresponding A matrices,
     time the intersection test,
@@ -154,7 +154,7 @@ def empirical_intersections_plot_triples(points, A_list, manifold, surface, eps=
         As = [A_list[i], A_list[j], A_list[k]]
         # Put start-time, end-time surrounding this
         start_time = time.perf_counter()
-        result = minimize_K(eps, pts, A_list=As)
+        result = minimize_K(eps, pts, A_list=As, solver=solver)
         end_time = time.perf_counter()
 
         print("Total minimizer time (includes inverting As) = " + str(end_time - start_time))
@@ -207,7 +207,7 @@ def empirical_runtime_on_point_cloud(n=30, eps=0.5, max_plots=6):
     """
     np.random.seed(42)  # For reproducibility
     seed = 17
-
+    # TODO: this has been refactored into 'generate_point_cloud_and_As' in runtime_plots.py. Let's replace this.
     # Generate the point cloud on a sphere
     bm = BrownianMotion()
     sphere = Sphere()
@@ -219,6 +219,7 @@ def empirical_runtime_on_point_cloud(n=30, eps=0.5, max_plots=6):
     p = compute_orthogonal_projection_from_cov(cov)
     a = np.zeros((n, 3, 3))
     for i in range(n):
+        # We can either do EVD of the orthogonal projection (obtained from SVD of cov) or do EVD of cov.
         eigenvalues, eigenvectors = np.linalg.eigh(p[i])
         s = np.diag(eigenvalues)
         sn = np.zeros((3, 3))
