@@ -8,7 +8,7 @@ def parse_requirements(filename):
 
 setup(
     name='ae',
-    version='0.1.4',
+    version='0.1.5',
     packages=find_packages(include=["ae", "ae.*"]),
     exclude_package_data={"": ["experiments/*"]},
     url='https://github.com/shill1729/research',
