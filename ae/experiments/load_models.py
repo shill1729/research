@@ -37,7 +37,7 @@ dynamics_name = dynamics.__class__.__name__
 print("Current setting in latent_vs_ambient_dynamics.py = ")
 print(surface_name)
 print(dynamics_name)
-save_dir = "trained_models/Paraboloid/LangevinHarmonicOscillator/trained_20250306-150817_h[32, 32]_df[8]_dr[8]_lr0.001_epochs9000"
+save_dir = "trained_models/Paraboloid/LangevinHarmonicOscillator/trained_20250306-172841_h[32]_df[16]_dr[16]_lr0.001_epochs12000_not_annealed"
 ae_diffusion_vanilla.load_state_dict(torch.load(os.path.join(save_dir, "ae_diffusion_vanilla.pth")))
 ae_diffusion_first.load_state_dict(torch.load(os.path.join(save_dir, "ae_diffusion_first.pth")))
 ae_diffusion_second.load_state_dict(torch.load(os.path.join(save_dir, "ae_diffusion_second.pth")))

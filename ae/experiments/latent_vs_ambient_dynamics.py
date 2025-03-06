@@ -27,6 +27,7 @@ from ae.utils.performance_analysis import compute_test_losses
 
 from ae.sdes import SDE
 from ae.experiments.helpers import *
+# TODO: only plot the boundary errors. Print the interior errors.
 # ---------------------------
 # SET HYPERPARAMETERS & SEEDS
 # ---------------------------
@@ -39,27 +40,27 @@ penalty = "reconstruction loss"
 # Point cloud parameters
 num_points = 30
 num_test = 20000
-batch_size = 25
+batch_size = 20
 eps_max = 1.
 eps_grid_size = 20
 
 # The intrinsic and extrinsic dimensions.
 extrinsic_dim, intrinsic_dim = 3, 2
-hidden_dims = [32, 32]
-diffusion_layers = [8]
-drift_layers = [8]
+hidden_dims = [32]
+diffusion_layers = [16]
+drift_layers = [16]
 lr = 0.001
 weight_decay = 0.
-epochs_ae = 9000
-epochs_diffusion = 1000
-epochs_drift = 1000
+epochs_ae = 12000
+epochs_diffusion = 9000
+epochs_drift = 9000
 print_freq = 500
 # Diffeo weight for accumulative orders
-diffeo_weight_12 = 0.01  # this is the separate diffeo_weight for just the First order and second order
+diffeo_weight_12 = 0.08  # this is the separate diffeo_weight for just the First order and second order
 # First order weight: 0.08 was good
-tangent_angle_weight = 0.01
+tangent_angle_weight = 0.08
 # Second order weights accumulative
-tangent_angle_weight2 = 0.01  # the first order weight for the second order model, if accumulating penalties
+tangent_angle_weight2 = 0.08  # the first order weight for the second order model, if accumulating penalties
 tangent_drift_weight = 0.001
 # diffeo weight alone
 # diffeo_weight = 0.2  # I think making this higher helps contract but worsens the second order
@@ -70,14 +71,16 @@ diffusion_act = nn.Tanh()
 npaths = 2
 ntime = 1000
 tn = 1
+# TODO: toggle these for annealing the second order weight
+# anneal_weights = { "tangent_drift_weight": lambda epoch: tangent_drift_weight * (epoch / epochs_ae) if epoch >
+# np.round(epochs_ae/3) else 0.}
+anneal_weights = None
 
-anneal_weights = { "tangent_drift_weight": lambda epoch: tangent_drift_weight * (epoch / epochs_ae) if epoch >
-np.round(epochs_ae/3) else 0.}
-# anneal_weights = None
+anneal_tag = "annealed_2nd" if anneal_weights is not None else "not_annealed"
 # -------------------------------------
 # CHOOSE THE SURFACE AND GET THE BOUNDS
 # -------------------------------------
-surface = Paraboloid(5., 5. )
+surface = Paraboloid(5., 5.)
 bounds = surface.bounds()  # native bounds in the local coordinates
 # For testing, we will enlarge these bounds by ε.
 
@@ -115,7 +118,7 @@ if __name__ == "__main__":
     }
     # Automatically save to the right folder:
     base_dir = "trained_models/"+surface.__class__.__name__+"/"+dynamics.__class__.__name__
-    exp_dir = setup_experiment_dir(params, base_dir)
+    exp_dir = setup_experiment_dir(params, base_dir, anneal_tag)
     print(f"Saving results to {exp_dir}")
     # -------------------------------------
     # GENERATE TRAINING DATA (POINT CLOUD)
@@ -183,7 +186,8 @@ if __name__ == "__main__":
 
 
     def fit_wrapper(ae_diffusion: AutoEncoderDiffusion, weights, anneal_weights):
-        trained_model = fit3.three_stage_fit(ae_diffusion, weights, x, mu, cov, p, orthonormal_frame, anneal_weights, norm, device)
+        trained_model = fit3.three_stage_fit(ae_diffusion, weights, x, mu, cov, p, orthonormal_frame, anneal_weights,
+                                             norm, device)
         return trained_model
 
 
@@ -192,7 +196,7 @@ if __name__ == "__main__":
     print("\nTraining first order model (tangent angle loss)...")
     ae_diffusion_first = fit_wrapper(ae_diffusion_first, weights_first, None)
     print("\nTraining second order model (tangent drift alignment loss)...")
-    ae_diffusion_second = fit_wrapper(ae_diffusion_second, weights_second, None)
+    ae_diffusion_second = fit_wrapper(ae_diffusion_second, weights_second, anneal_weights=anneal_weights)
     print("Training ambient drift network")
     z = ae_diffusion_vanilla.autoencoder.encoder(x).detach()
     ambient_drift_loss = AmbientDriftLoss()

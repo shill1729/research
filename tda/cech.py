@@ -4,7 +4,7 @@ import numpy as np
 from scipy.spatial import cKDTree
 import itertools
 import matplotlib.pyplot as plt
-from tda.solvers.intersection_solver import ellipsoidal_intersection,minimize_K
+from tda.solvers.scipy_solver import ellipsoidal_intersection,minimize_K
 
 
 def build_cech_complex(points, A_list, eps, k_nn=20, max_dim=3):

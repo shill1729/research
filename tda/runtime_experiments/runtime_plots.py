@@ -3,7 +3,9 @@ import time
 import numpy as np
 import matplotlib.pyplot as plt
 
-from tda.solvers.intersection_solver import minimize_K, cauchy_simplex_minimize_K, projected_gradient_descent
+from tda.solvers.scipy_solver import minimize_K
+from tda.solvers.pgd import projected_gradient_descent
+from tda.solvers.cauchy_simplex_solver import cauchy_simplex_solver
 from tda.toydata.pointclouds import generate_point_cloud_and_As
 
 
@@ -28,7 +30,7 @@ def time_intersection_tests(n, eps=0.5, solver="SLSQP"):
         if solver != "CS" and solver != "pga":
             _ = minimize_K(eps, pts, A_list=As, solver=solver)
         else:
-            _ = cauchy_simplex_minimize_K(eps, pts, A_list=As)
+            _ = cauchy_simplex_solver(eps, pts, A_list=As)
         pair_count += 1
     end_pairs = time.perf_counter()
     pair_time = end_pairs - start_pairs
@@ -42,7 +44,7 @@ def time_intersection_tests(n, eps=0.5, solver="SLSQP"):
         if solver != "CS" and solver != "pga":
             _ = minimize_K(eps, pts, A_list=As, solver=solver)
         elif solver == "CS":
-            _ = cauchy_simplex_minimize_K(eps, pts, A_list=As)
+            _ = cauchy_simplex_solver(eps, pts, A_list=As)
         elif solver == "pga":
             _ = projected_gradient_descent(eps, pts, As)
         triple_count += 1
@@ -76,9 +78,9 @@ def plot_runtime_vs_n(n_values, pair_times, triple_times, solvers, log=False):
 def main():
     eps = 0.5
     # Define a list of n values. Be cautious: triple tests scale as O(n^3)
-    n_values = [5, 10, 20]
+    n_values = [5, 10, 20, 30, 40, 50]
     # The only relevant ones are SLSQP, trust_constr, and COB-...
-    solvers = ["SLSQP", "pga"]
+    solvers = ["SLSQP"]
     pair_times = np.zeros((len(n_values), len(solvers)))
     triple_times = np.zeros((len(n_values), len(solvers)))
     print("Measuring runtimes for intersection tests:")

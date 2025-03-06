@@ -12,7 +12,7 @@ from load_models import (ae_diffusion_vanilla, ae_diffusion_first,
                          ambient_drift, ambient_diffusion, save_dir)
 
 seed = None
-npaths = 250  # Number of sample paths per model
+npaths = 1000  # Number of sample paths per model
 # Run 0.05, 0.5, 1, and 5
 T_max = 0.01
 # short term vs long term
@@ -340,7 +340,7 @@ def plot_time_series_cov_errors(time_grid, paths_ground_truth_full, paths_ambien
     error_type = "Relative error" if relative else "Absolute error"
     ax.set_xlabel("Time")
     ax.set_ylabel("Covariance Error")
-    ax.set_title(error_type+" $\\|Cov(X_t)-Cov(\hat{X}_t)\\|_{"+str(norm)+"}$")
+    ax.set_title(error_type+" $\\|Cov(X_t)-Cov(\\hat{X}_t)\\|_{"+str(norm)+"}$")
     ax.legend()
     ax.grid(True)
     plt.show()
@@ -348,7 +348,7 @@ def plot_time_series_cov_errors(time_grid, paths_ground_truth_full, paths_ambien
     # Save the plot
     fk_stats_folder = save_dir + time_horizon
     os.makedirs(fk_stats_folder, exist_ok=True)
-    save_plot(fig, save_dir + time_horizon, "cov_errors")
+    save_plot(fig, save_dir + time_horizon, "cov_errors_"+str(norm))
 
 
 def plot_time_series_no_conf(results_time, time_grid):
