@@ -1,9 +1,10 @@
 import numpy as np
 from scipy.optimize import minimize
 from tda.solvers.kfunction import compute_K_gradient_fast, compute_K_fast, compute_K_hessian_fast, get_A_operations_fast
+from tda.solvers.kfunction import compute_K, compute_K_gradient
 
 
-def minimize_K(eps, xs, A_list=None, solver="SLSQP"):
+def minimize_K(eps, xs, A_array=None, solver="SLSQP"):
     """
     Minimizes K(λ) = eps^2 - C(λ) over the probability simplex using the simplified gradient.
 
@@ -14,10 +15,10 @@ def minimize_K(eps, xs, A_list=None, solver="SLSQP"):
     :return:
     """
     k, D = xs.shape
-    if A_list is None:
-        A_list = [np.eye(D) for _ in range(k)]
+    if A_array is None:
+        raise ValueError("Must past an array of matrices of shape (k, d, d)")
 
-    A_inv_array, x_Ainv_x = get_A_operations_fast(A_list, xs)
+    A_inv_array, x_Ainv_x = get_A_operations_fast(A_array, xs)
 
     # Define the objective and its gradient.
     def obj(lmbd, eps, xs, A_inv_array, x_Ainv_x):

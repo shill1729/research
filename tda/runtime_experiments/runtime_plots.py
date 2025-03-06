@@ -26,9 +26,11 @@ def time_intersection_tests(n, eps=0.5, solver="SLSQP"):
     start_pairs = time.perf_counter()
     for i, j in itertools.combinations(range(n), 2):
         pts = np.array([x[i], x[j]])
-        As = [A_list[i], A_list[j]]
+        # As = [A_list[i], A_list[j]]
+        As = np.array([A_list[i], A_list[j]])
+        print(As.shape)
         if solver != "CS" and solver != "pga":
-            _ = minimize_K(eps, pts, A_list=As, solver=solver)
+            _ = minimize_K(eps, pts, A_array=As, solver=solver)
         else:
             _ = cauchy_simplex_solver(eps, pts, A_list=As)
         pair_count += 1
@@ -40,9 +42,10 @@ def time_intersection_tests(n, eps=0.5, solver="SLSQP"):
     start_triples = time.perf_counter()
     for i, j, k in itertools.combinations(range(n), 3):
         pts = np.array([x[i], x[j], x[k]])
-        As = [A_list[i], A_list[j], A_list[k]]
+        As = np.array([A_list[i], A_list[j], A_list[k]])
+        print(As.shape)
         if solver != "CS" and solver != "pga":
-            _ = minimize_K(eps, pts, A_list=As, solver=solver)
+            _ = minimize_K(eps, pts, A_array=As, solver=solver)
         elif solver == "CS":
             _ = cauchy_simplex_solver(eps, pts, A_list=As)
         elif solver == "pga":
@@ -78,7 +81,7 @@ def plot_runtime_vs_n(n_values, pair_times, triple_times, solvers, log=False):
 def main():
     eps = 0.5
     # Define a list of n values. Be cautious: triple tests scale as O(n^3)
-    n_values = [5, 10, 20, 30, 40, 50]
+    n_values = [5, 10]
     # The only relevant ones are SLSQP, trust_constr, and COB-...
     solvers = ["SLSQP"]
     pair_times = np.zeros((len(n_values), len(solvers)))
