@@ -1,19 +1,12 @@
-import matplotlib.pyplot as plt
-import numpy as np
-from scipy.optimize import minimize
-from matplotlib.patches import Ellipse
-
 from ae.symbolic.diffgeo import RiemannianManifold
 from ae.toydata.pointclouds import PointCloud
 from ae.toydata.local_dynamics import BrownianMotion
 from ae.toydata.surfaces import Sphere
 from ae.utils import compute_orthogonal_projection_from_cov
-from tda.intersection_solver import minimize_K, compute_K
+from tda.solvers.intersection_solver import minimize_K
 
 import numpy as np
-from scipy.optimize import minimize
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 from matplotlib.patches import Ellipse
 
 

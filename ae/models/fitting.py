@@ -16,7 +16,8 @@ def fit_model(model: nn.Module,
               epochs: int = 1000,
               print_freq: int = 1000,
               weight_decay: float = 0.,
-              batch_size: int = None) -> None:
+              batch_size: int = None,
+              anneal_weights=None) -> None:
     """
     Fit any auto-differentiable model.
 
@@ -49,6 +50,16 @@ def fit_model(model: nn.Module,
     for epoch in range(epochs + 1):
         model.train()
         epoch_loss = 0.0  # Reset the epoch loss at the start of each epoch
+
+        # Anneal weights if applicable
+        if isinstance(loss, TotalLoss) and anneal_weights is not None:
+            for weight_name, schedule in anneal_weights.items():
+                if hasattr(loss.weights, weight_name):
+                    if callable(schedule):
+                        setattr(loss.weights, weight_name, schedule(epoch))
+                    elif isinstance(schedule, list) and len(schedule) > epoch:
+                        setattr(loss.weights, weight_name, schedule[epoch])
+
         for batch in dataloader:
             optimizer.zero_grad()
             inputs = batch[0]
@@ -61,7 +72,8 @@ def fit_model(model: nn.Module,
             epoch_loss += loss_value.item()  # Accumulate batch loss into epoch loss
         # Print average loss for the epoch if print_freq is met
         if epoch % print_freq == 0:
-            print(f'Epoch: {epoch}: Train-Loss: {epoch_loss / len(dataloader):.6f}')
+            # print(f'Epoch: {epoch}: Train-Loss: {epoch_loss / len(dataloader):.6f}')
+            print(f'Epoch: {epoch}: Train-Loss: {epoch_loss:.6f}')
     return None
 
 
@@ -75,7 +87,7 @@ class ThreeStageFit:
         self.batch_size = batch_size
         self.print_freq = print_freq
 
-    def three_stage_fit(self, ae_diffusion, weights, x, mu, cov, p, orthonormal_frame, norm="fro", device="cpu"):
+    def three_stage_fit(self, ae_diffusion, weights, x, mu, cov, p, orthonormal_frame, anneal_weights=None, norm="fro", device="cpu"):
         ae_loss = TotalLoss(weights, norm, device)
         diffusion_loss = LocalDiffusionLoss(norm)
         drift_loss = LocalDriftLoss()
@@ -93,7 +105,8 @@ class ThreeStageFit:
                   epochs=self.epochs_ae,
                   print_freq=self.print_freq,
                   weight_decay=self.weight_decay,
-                  batch_size=self.batch_size
+                  batch_size=self.batch_size,
+                  anneal_weights=anneal_weights
                   )
         dpi = ae_diffusion.autoencoder.encoder_jacobian(x).detach()
         set_grad_tracking(ae_diffusion.autoencoder, False)

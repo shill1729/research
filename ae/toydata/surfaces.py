@@ -53,6 +53,10 @@ class SurfaceBase(ABC):
         """
         pass
 
+    @abstractmethod
+    def name(self):
+        pass
+
 
 # Specific Surface Implementations
 
@@ -62,6 +66,9 @@ class Cylinder(SurfaceBase):
 
     def bounds(self):
         return [(0, 2 * np.pi), (-2, 2)]
+
+    def name(self):
+        return "cylinder"
 
 
 class WaveSurface(SurfaceBase):
@@ -80,6 +87,9 @@ class WaveSurface(SurfaceBase):
     def bounds(self):
         return [(-2*np.pi, 2*np.pi), (-2*np.pi, 2*np.pi)]
 
+    def name(self):
+        return "wave"
+
 
 class Torus(SurfaceBase):
     def __init__(self, R=1, r=0.5):
@@ -97,6 +107,9 @@ class Torus(SurfaceBase):
     def bounds(self):
         return [(0, 2 * np.pi), (0, 2 * np.pi)]
 
+    def name(self):
+        return "torus"
+
 
 class Paraboloid(SurfaceBase):
     def __init__(self, a=1, b=1):
@@ -111,6 +124,9 @@ class Paraboloid(SurfaceBase):
     def bounds(self):
         return [(-1, 1), (-1, 1)]
 
+    def name(self):
+        return "paraboloid"
+
 
 class ProductSurface(SurfaceBase):
     def __init__(self, a=1):
@@ -123,6 +139,9 @@ class ProductSurface(SurfaceBase):
 
     def bounds(self):
         return [(-1, 1), (-1, 1)]
+
+    def name(self):
+        return "product_surface"
 
 
 class HyperbolicParaboloid(SurfaceBase):
@@ -138,6 +157,10 @@ class HyperbolicParaboloid(SurfaceBase):
     def bounds(self):
         return [(-2, 2), (-2, 2)]
 
+    def name(self):
+        return "hyperbolic_paraboloid"
+
+
 
 class Sphere(SurfaceBase):
     def equation(self):
@@ -149,6 +172,9 @@ class Sphere(SurfaceBase):
 
     def bounds(self):
         return [(0, np.pi), (0, 2 * np.pi)]
+
+    def name(self):
+        return "sphere"
 
 
 class QuarticMinusCubic(SurfaceBase):
@@ -164,6 +190,9 @@ class QuarticMinusCubic(SurfaceBase):
     def bounds(self):
         return [(-1, 1), (-1, 1)]
 
+    def name(self):
+        return "quartic_minus_cubic"
+
 
 class RationalSurface(SurfaceBase):
     def __init__(self, a=1, b=1):
@@ -177,6 +206,9 @@ class RationalSurface(SurfaceBase):
 
     def bounds(self):
         return [(-1, 1), (-1, 1)]
+
+    def name(self):
+        return "rational_surface"
 
 
 # Example of usage
@@ -194,4 +226,5 @@ if __name__ == "__main__":
         print(f"Surface: {surface.__class__.__name__}")
         print(f"Local Coordinates: {surface.local_coords()}")
         print(f"Equation: {surface.equation()}")
-        print(f"Bounds: {surface.bounds()}\n")
+        print(f"Bounds: {surface.bounds()}")
+        print(f"Name: {surface.name()}\n")

@@ -245,7 +245,7 @@ class TangentDriftAlignment(nn.Module):
         frame_transpose_times_tangent_vector = torch.bmm(observed_frame.mT, tangent_drift.unsqueeze(2))
         tangent_projected = torch.bmm(observed_frame, frame_transpose_times_tangent_vector).squeeze(2)
         normal_projected_tangent_drift = tangent_drift - tangent_projected
-        return torch.mean(torch.linalg.vector_norm(normal_projected_tangent_drift, ord=2))
+        return torch.mean(torch.linalg.vector_norm(normal_projected_tangent_drift, ord=2, dim=1))
 
 
 class TangentDriftAlignment2(nn.Module):
@@ -272,7 +272,7 @@ class TangentDriftAlignment2(nn.Module):
         :param kwargs:
         """
         super().__init__(*args, **kwargs)
-        self.reconstruction_loss = nn.MSELoss()
+        # self.reconstruction_loss = nn.MSELoss()
 
     @staticmethod
     def forward(encoder_jacobian, decoder_hessian, ambient_cov, ambient_drift, observed_normal_proj):
@@ -296,13 +296,15 @@ class TangentDriftAlignment2(nn.Module):
         bbt_proxy = torch.bmm(torch.bmm(encoder_jacobian, ambient_cov), encoder_jacobian.mT)
         # The QV correction from d -> D with the proxy-local cov: q^i = < bb^T, nabla^2 phi^i >_F
         qv = ambient_quadratic_variation_drift(bbt_proxy, decoder_hessian)
-        # The ambient drift mu = Dphi a + 0.5 q should satisfy v := mu-0.5 q has P v = 0 since v = Dphi a is tangent
+        # The ambient drift mu = Dphi a + 0.5 q should satisfy v := mu-0.5 q has N v = 0 since v = Dphi a is tangent
         # to the manifold
         tangent_drift = ambient_drift - 0.5 * qv
         # Compute N . (mu-0.5 q)
         normal_projected_tangent_drift = torch.bmm(observed_normal_proj, tangent_drift.unsqueeze(2)).squeeze(2)
         # Return the mean of the norm squared
-        loss = torch.mean(torch.linalg.vector_norm(normal_projected_tangent_drift, ord=2))
+        # (nbatch, dim)
+        euclidean_norm = torch.linalg.vector_norm(normal_projected_tangent_drift, ord=2, dim=1)**2
+        loss = torch.mean(euclidean_norm)
         return loss
 
 
@@ -434,11 +436,11 @@ class TotalLoss(nn.Module):
             total_loss += self.weights.tangent_space_error_weight * tangent_bundle_loss
         # Drift alignment regularization
         if self.weights.tangent_drift_weight > 0:
-            drift_alignment_loss = self.drift_alignment_reg.forward(encoder_jacobian,
-                                                                    decoder_hessian,
-                                                                    ambient_cov,
-                                                                    ambient_drift,
-                                                                    true_normal_proj)
+            drift_alignment_loss = self.drift_alignment_reg.forward(encoder_jacobian=encoder_jacobian,
+                                                                    decoder_hessian=decoder_hessian,
+                                                                    ambient_cov=ambient_cov,
+                                                                    ambient_drift=ambient_drift,
+                                                                    observed_normal_proj=true_normal_proj)
             total_loss += self.weights.tangent_drift_weight * drift_alignment_loss
         # Diffeomorphism regularization
         if self.weights.diffeomorphism_reg > 0:

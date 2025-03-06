@@ -1,84 +1,126 @@
+"""
+Run this module then update the path in load_models.py and then run feynmankac_stats.py
+"""
+import torch
+import torch.nn as nn
+import sympy as sp
+import numpy as np
+import os
+import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
+
+# --- IMPORTS FROM CODE BASE ---
+from ae.symbolic.diffgeo import RiemannianManifold
+from ae.toydata.pointclouds import PointCloud
+from ae.toydata.local_dynamics import *
+from ae.toydata.surfaces import *
+
+from ae.models.autoencoder import AutoEncoder
+from ae.models.local_neural_sdes import LatentNeuralSDE, AutoEncoderDiffusion
+from ae.models.losses import LossWeights, TotalLoss, LocalDiffusionLoss, LocalDriftLoss
+from ae.models.losses import AmbientDriftLoss, AmbientDiffusionLoss
+from ae.models.ambient_sdes import AmbientDriftNetwork, AmbientDiffusionNetwork
+
+from ae.utils import process_data
+from ae.models.fitting import ThreeStageFit, fit_model
+from ae.utils.performance_analysis import compute_test_losses
+
+from ae.sdes import SDE
+from ae.experiments.helpers import *
+# ---------------------------
+# SET HYPERPARAMETERS & SEEDS
+# ---------------------------
+device = torch.device("cpu")
+train_seed = None
+test_seed = None
+norm = "fro"
+# torch.manual_seed(train_seed)
+penalty = "reconstruction loss"
+# Point cloud parameters
+num_points = 30
+num_test = 20000
+batch_size = 25
+eps_max = 1.
+eps_grid_size = 20
+
+# The intrinsic and extrinsic dimensions.
+extrinsic_dim, intrinsic_dim = 3, 2
+hidden_dims = [32, 32]
+diffusion_layers = [8]
+drift_layers = [8]
+lr = 0.001
+weight_decay = 0.
+epochs_ae = 9000
+epochs_diffusion = 1000
+epochs_drift = 1000
+print_freq = 500
+# Diffeo weight for accumulative orders
+diffeo_weight_12 = 0.01  # this is the separate diffeo_weight for just the First order and second order
+# First order weight: 0.08 was good
+tangent_angle_weight = 0.01
+# Second order weights accumulative
+tangent_angle_weight2 = 0.01  # the first order weight for the second order model, if accumulating penalties
+tangent_drift_weight = 0.001
+# diffeo weight alone
+# diffeo_weight = 0.2  # I think making this higher helps contract but worsens the second order
+encoder_act = nn.Tanh()
+decoder_act = nn.Tanh()
+drift_act = nn.Tanh()
+diffusion_act = nn.Tanh()
+npaths = 2
+ntime = 1000
+tn = 1
+
+anneal_weights = { "tangent_drift_weight": lambda epoch: tangent_drift_weight * (epoch / epochs_ae) if epoch >
+np.round(epochs_ae/3) else 0.}
+# anneal_weights = None
+# -------------------------------------
+# CHOOSE THE SURFACE AND GET THE BOUNDS
+# -------------------------------------
+surface = Paraboloid(5., 5. )
+bounds = surface.bounds()  # native bounds in the local coordinates
+# For testing, we will enlarge these bounds by ε.
+
+# Initialize the manifold and dynamics.
+manifold = RiemannianManifold(surface.local_coords(), surface.equation())
+dynamics = LangevinHarmonicOscillator()
+local_drift = dynamics.drift(manifold)
+local_diffusion = dynamics.diffusion(manifold)
+
+cloud_train = PointCloud(manifold, bounds, local_drift, local_diffusion, compute_orthogonal_proj=True)
 if __name__ == "__main__":
-    import torch
-    import torch.nn as nn
-    import sympy as sp
-    import numpy as np
-    import matplotlib.pyplot as plt
-    from matplotlib.lines import Line2D
-
-    # --- IMPORTS FROM CODE BASE ---
-    from ae.symbolic.diffgeo import RiemannianManifold
-    from ae.toydata.pointclouds import PointCloud
-    from ae.toydata.local_dynamics import *
-    from ae.toydata.surfaces import *
-
-    from ae.models.autoencoder import AutoEncoder
-    from ae.models.local_neural_sdes import LatentNeuralSDE, AutoEncoderDiffusion
-    from ae.models.losses import LossWeights, TotalLoss, LocalDiffusionLoss, LocalDriftLoss
-    from ae.models.losses import AmbientDriftLoss, AmbientDiffusionLoss
-    from ae.models.ambient_sdes import AmbientDriftNetwork, AmbientDiffusionNetwork
-
-    from ae.utils import process_data
-    from ae.models.fitting import ThreeStageFit, fit_model
-    from ae.utils.performance_analysis import compute_test_losses
-
-    from ae.sdes import SDE
-
-    # ---------------------------
-    # SET HYPERPARAMETERS & SEEDS
-    # ---------------------------
-    device = torch.device("cpu")
-    train_seed = None
-    test_seed = None
-    norm = "fro"
-    # torch.manual_seed(train_seed)
-
-    # Point cloud parameters
-    num_points = 30
-    num_test = 10000
-    batch_size = 15
-    eps_max = 0.5
-    eps_grid_size = 10
-
-    # The intrinsic and extrinsic dimensions.
-    extrinsic_dim, intrinsic_dim = 3, 2
-    hidden_dims = [64]
-    diffusion_layers = [2]
-    drift_layers = [2]
-    lr = 0.001
-    weight_decay = 0.
-    epochs_ae = 9000
-    epochs_diffusion = 9000
-    epochs_drift = 9000
-    print_freq = 500
-    tangent_angle_weight = 0.03
-    tangent_drift_weight = 0.03
-    diffeo_weight = 0.1
-    encoder_act = nn.Tanh()
-    decoder_act = nn.Tanh()
-    drift_act = nn.Tanh()
-    diffusion_act = nn.Tanh()
-    npaths = 5
-    ntime = 5000
-    tn = 5.
-
-    # -------------------------------------
-    # CHOOSE THE SURFACE AND GET THE BOUNDS
-    # -------------------------------------
-    surface = RationalSurface()
-    bounds = surface.bounds()  # native bounds in the local coordinates
-    # For testing, we will enlarge these bounds by ε.
-
-    # Initialize the manifold and dynamics.
-    manifold = RiemannianManifold(surface.local_coords(), surface.equation())
-    dynamics = LangevinDoubleWell()
-    local_drift = dynamics.drift(manifold)
-    local_diffusion = dynamics.diffusion(manifold)
-
+    params = {
+        "num_points": num_points,
+        "num_test": num_test,
+        "batch_size": batch_size,
+        "eps_max": eps_max,
+        "eps_grid_size": eps_grid_size,
+        "extrinsic_dim": extrinsic_dim,
+        "intrinsic_dim": intrinsic_dim,
+        "hidden_dims": hidden_dims,
+        "diffusion_layers": diffusion_layers,
+        "drift_layers": drift_layers,
+        "lr": lr,
+        "weight_decay": weight_decay,
+        "epochs_ae": epochs_ae,
+        "epochs_diffusion": epochs_diffusion,
+        "epochs_drift": epochs_drift,
+        "print_freq": print_freq,
+        "tangent_angle_weight": tangent_angle_weight,
+        "tangent_drift_weight": tangent_drift_weight,
+        "diffeo_weight": diffeo_weight_12,
+        "npaths": npaths,
+        "ntime": ntime,
+        "tn": tn,
+    }
+    # Automatically save to the right folder:
+    base_dir = "trained_models/"+surface.__class__.__name__+"/"+dynamics.__class__.__name__
+    exp_dir = setup_experiment_dir(params, base_dir)
+    print(f"Saving results to {exp_dir}")
     # -------------------------------------
     # GENERATE TRAINING DATA (POINT CLOUD)
     # -------------------------------------
-    cloud_train = PointCloud(manifold, bounds, local_drift, local_diffusion, compute_orthogonal_proj=True)
+
     # Generate: points, weights, drifts, covariances, and local coordinates.
     x, _, mu, cov, local_x = cloud_train.generate(num_points, seed=train_seed)
     # Process data: process_data returns projection matrices (p) and an orthonormal frame.
@@ -92,16 +134,16 @@ if __name__ == "__main__":
     weights_vanilla = LossWeights()
     # First order: activate only tangent angle loss.
     weights_first = LossWeights()
-    weights_first.diffeomorphism_reg = diffeo_weight
+    weights_first.diffeomorphism_reg = diffeo_weight_12
     weights_first.tangent_angle_weight = tangent_angle_weight
-    # Second order: activate only tangent drift alignment loss.
+    # Second order: activate only up to tangent drift alignment loss.
     weights_second = LossWeights()
-    weights_second.tangent_angle_weight = tangent_angle_weight
+    weights_second.diffeomorphism_reg = diffeo_weight_12
+    weights_second.tangent_angle_weight = tangent_angle_weight2
     weights_second.tangent_drift_weight = tangent_drift_weight
-    weights_second.diffeomorphism_reg = diffeo_weight
     # Diffeomorphic model:
-    weights_diffeo = LossWeights()
-    weights_diffeo.diffeomorphism_reg = diffeo_weight
+    # weights_diffeo = LossWeights()
+    # weights_diffeo.diffeomorphism_reg = diffeo_weight
 
     # Instantiate the AutoEncoder + Neural SDE models.
     # Vanilla model:
@@ -123,11 +165,11 @@ if __name__ == "__main__":
                                         drift_act, diffusion_act, encoder_act)
     ae_diffusion_second = AutoEncoderDiffusion(latent_sde_second, ae_second)
 
-    # Diffeomorphic model:
-    ae_diffeo = AutoEncoder(extrinsic_dim, intrinsic_dim, hidden_dims, encoder_act, decoder_act)
-    latent_sde_diffeo = LatentNeuralSDE(intrinsic_dim, drift_layers, diffusion_layers,
-                                        drift_act, diffusion_act, encoder_act)
-    ae_diffusion_diffeo = AutoEncoderDiffusion(latent_sde_diffeo, ae_diffeo)
+    # #Diffeomorphic model:
+    # ae_diffeo = AutoEncoder(extrinsic_dim, intrinsic_dim, hidden_dims, encoder_act, decoder_act)
+    # latent_sde_diffeo = LatentNeuralSDE(intrinsic_dim, drift_layers, diffusion_layers,
+    #                                     drift_act, diffusion_act, encoder_act)
+    # ae_diffusion_diffeo = AutoEncoderDiffusion(latent_sde_diffeo, ae_diffeo)
 
     # Ambient networks for dynamics
     # TODO: be able to switch between R^d\to R^D and R^D to R^D to compare to our model
@@ -139,31 +181,19 @@ if __name__ == "__main__":
     # -------------------------------------
     fit3 = ThreeStageFit(lr, epochs_ae, epochs_diffusion, epochs_drift, weight_decay, batch_size, print_freq)
 
+
+    def fit_wrapper(ae_diffusion: AutoEncoderDiffusion, weights, anneal_weights):
+        trained_model = fit3.three_stage_fit(ae_diffusion, weights, x, mu, cov, p, orthonormal_frame, anneal_weights, norm, device)
+        return trained_model
+
+
     print("Training vanilla model (no extra penalties)...")
-    ae_diffusion_vanilla = fit3.three_stage_fit(ae_diffusion_vanilla,
-                                                weights_vanilla,
-                                                x, mu, cov, p, orthonormal_frame,
-                                                norm, device)
-
+    ae_diffusion_vanilla = fit_wrapper(ae_diffusion_vanilla, weights_vanilla, None)
     print("\nTraining first order model (tangent angle loss)...")
-    ae_diffusion_first = fit3.three_stage_fit(ae_diffusion_first,
-                                              weights_first,
-                                              x, mu, cov, p, orthonormal_frame,
-                                              norm, device)
-
+    ae_diffusion_first = fit_wrapper(ae_diffusion_first, weights_first, None)
     print("\nTraining second order model (tangent drift alignment loss)...")
-    ae_diffusion_second = fit3.three_stage_fit(ae_diffusion_second,
-                                               weights_second,
-                                               x, mu, cov, p, orthonormal_frame,
-                                               norm, device)
-    print("\nTraining diffeo model...")
-    ae_diffusion_diffeo = fit3.three_stage_fit(ae_diffusion_diffeo,
-                                               weights_diffeo,
-                                               x, mu, cov, p, orthonormal_frame,
-                                               norm, device)
-
+    ae_diffusion_second = fit_wrapper(ae_diffusion_second, weights_second, None)
     print("Training ambient drift network")
-
     z = ae_diffusion_vanilla.autoencoder.encoder(x).detach()
     ambient_drift_loss = AmbientDriftLoss()
     fit_model(ambient_drift, ambient_drift_loss, x, mu, lr, epochs_drift, print_freq, weight_decay, batch_size)
@@ -260,7 +290,7 @@ if __name__ == "__main__":
                 mu_int = mu_test[interior_mask]
                 losses_int = compute_test_losses(model, ae_loss, x_int, p_int, frame_int, cov_int, mu_int,
                                                  device=device)
-                rec_int = losses_int["reconstruction loss"]
+                rec_int = losses_int[penalty]
             else:
                 rec_int = np.nan
 
@@ -272,7 +302,7 @@ if __name__ == "__main__":
                 mu_bnd = mu_test[boundary_mask]
                 losses_bnd = compute_test_losses(model, ae_loss, x_bnd, p_bnd, frame_bnd, cov_bnd, mu_bnd,
                                                  device=device)
-                rec_bnd = losses_bnd["reconstruction loss"]
+                rec_bnd = losses_bnd[penalty]
             else:
                 rec_bnd = np.nan
 
@@ -330,18 +360,18 @@ if __name__ == "__main__":
         errors_vanilla_interior, errors_vanilla_boundary = [], []
         errors_first_interior, errors_first_boundary = [], []
         errors_second_interior, errors_second_boundary = [], []
-        errors_diffeo_interior, errors_diffeo_boundary = [], []
+        # errors_diffeo_interior, errors_diffeo_boundary = [], []
         # Diffusion errors
         errors_vanilla_diff_interior, errors_vanilla_diff_boundary = [], []
         errors_first_diff_interior, errors_first_diff_boundary = [], []
         errors_second_diff_interior, errors_second_diff_boundary = [], []
-        errors_diffeo_diff_interior, errors_diffeo_diff_boundary = [], []
+        # errors_diffeo_diff_interior, errors_diffeo_diff_boundary = [], []
         errors_ambient_diffusion_interior, errors_ambient_diffusion_boundary = [], []
         # Drift errors
         errors_vanilla_drift_interior, errors_vanilla_drift_boundary = [], []
         errors_first_drift_interior, errors_first_drift_boundary = [], []
         errors_second_drift_interior, errors_second_drift_boundary = [], []
-        errors_diffeo_drift_interior, errors_diffeo_drift_boundary = [], []
+        # errors_diffeo_drift_interior, errors_diffeo_drift_boundary = [], []
         errors_ambient_drift_interior, errors_ambient_drift_boundary = [], []
 
         for eps in epsilons:
@@ -365,7 +395,7 @@ if __name__ == "__main__":
             rec_vanilla_int, rec_vanilla_bnd = subset_reconstruction_losses(ae_diffusion_vanilla)
             rec_first_int, rec_first_bnd = subset_reconstruction_losses(ae_diffusion_first)
             rec_second_int, rec_second_bnd = subset_reconstruction_losses(ae_diffusion_second)
-            rec_diffeo_int, rec_diffeo_bnd = subset_reconstruction_losses(ae_diffusion_diffeo)
+            # rec_diffeo_int, rec_diffeo_bnd = subset_reconstruction_losses(ae_diffusion_diffeo)
 
             # Compute diffusion and drift losses
             diff_vanilla_int, diff_vanilla_bnd, drift_vanilla_int, drift_vanilla_bnd = subset_diffusion_and_drift_losses(
@@ -374,8 +404,8 @@ if __name__ == "__main__":
                 ae_diffusion_first, local_space)
             diff_second_int, diff_second_bnd, drift_second_int, drift_second_bnd = subset_diffusion_and_drift_losses(
                 ae_diffusion_second, local_space)
-            diff_diffeo_int, diff_diffeo_bnd, drift_diffeo_int, drift_diffeo_bnd = subset_diffusion_and_drift_losses(
-                ae_diffusion_diffeo, local_space)
+            # diff_diffeo_int, diff_diffeo_bnd, drift_diffeo_int, drift_diffeo_bnd = subset_diffusion_and_drift_losses(
+            #     ae_diffusion_diffeo, local_space)
 
             # Ambient losses for vanilla model
             diffusion_ambient_int, diffusion_ambient_bnd, drift_ambient_int, drift_ambient_bnd = subset_ambient_diffusion_and_drift_losses(
@@ -390,9 +420,9 @@ if __name__ == "__main__":
             # Second order (diffeo+tangent space+ito curvature) recon loss
             errors_second_interior.append(rec_second_int)
             errors_second_boundary.append(rec_second_bnd)
-            # Diffeo only AE recon loss
-            errors_diffeo_interior.append(rec_diffeo_int)
-            errors_diffeo_boundary.append(rec_diffeo_bnd)
+            # # Diffeo only AE recon loss
+            # errors_diffeo_interior.append(rec_diffeo_int)
+            # errors_diffeo_boundary.append(rec_diffeo_bnd)
             # Covariance losses for each AE: 0th order
             errors_vanilla_diff_interior.append(diff_vanilla_int)
             errors_vanilla_diff_boundary.append(diff_vanilla_bnd)
@@ -402,9 +432,9 @@ if __name__ == "__main__":
             # Covariance loss under the 2nd order AE
             errors_second_diff_interior.append(diff_second_int)
             errors_second_diff_boundary.append(diff_second_bnd)
-            # Covariance loss under the diffeo penalized AE
-            errors_diffeo_diff_interior.append(diff_diffeo_int)
-            errors_diffeo_diff_boundary.append(diff_diffeo_bnd)
+            # # Covariance loss under the diffeo penalized AE
+            # errors_diffeo_diff_interior.append(diff_diffeo_int)
+            # errors_diffeo_diff_boundary.append(diff_diffeo_bnd)
             # Covariance loss for an ambient NN for model-covariance
             errors_ambient_diffusion_interior.append(diffusion_ambient_int)
             errors_ambient_diffusion_boundary.append(diffusion_ambient_bnd)
@@ -418,9 +448,9 @@ if __name__ == "__main__":
             # Drift loss for the 2nd order AE
             errors_second_drift_interior.append(drift_second_int)
             errors_second_drift_boundary.append(drift_second_bnd)
-            # Drift loss for the diffeo penalized AE
-            errors_diffeo_drift_interior.append(drift_diffeo_int)
-            errors_diffeo_drift_boundary.append(drift_diffeo_bnd)
+            # # Drift loss for the diffeo penalized AE
+            # errors_diffeo_drift_interior.append(drift_diffeo_int)
+            # errors_diffeo_drift_boundary.append(drift_diffeo_bnd)
             # Drift loss for the ambient NN for drift model
             errors_ambient_drift_interior.append(drift_ambient_int)
             errors_ambient_drift_boundary.append(drift_ambient_bnd)
@@ -429,33 +459,33 @@ if __name__ == "__main__":
             print(f"  Vanilla - Interior Rec. Loss: {rec_vanilla_int:.4f}, Boundary Rec. Loss: {rec_vanilla_bnd:.4f}")
             print(f"  First   - Interior Rec. Loss: {rec_first_int:.4f}, Boundary Rec. Loss: {rec_first_bnd:.4f}")
             print(f"  Second  - Interior Rec. Loss: {rec_second_int:.4f}, Boundary Rec. Loss: {rec_second_bnd:.4f}")
-            print(f"  Diffeo  - Interior Rec. Loss: {rec_diffeo_int:.4f}, Boundary Rec. Loss: {rec_diffeo_bnd:.4f}\n")
+            # print(f"  Diffeo  - Interior Rec. Loss: {rec_diffeo_int:.4f}, Boundary Rec. Loss: {rec_diffeo_bnd:.4f}\n")
 
         # -------------------------
         # Plot the error curves as before (using your plotting code)
         # -------------------------
         test_set_multiple_range = np.arange(1, eps_grid_size + 1) * num_test  # adjust if desired
         space = "Local" if local_space else "Ambient"
-        plt.figure(figsize=(8, 8))
+        fig = plt.figure(figsize=(8, 8))
         # Row 1: Reconstruction Loss
         plt.subplot(3, 2, 1)
         plt.plot(test_set_multiple_range, errors_vanilla_interior, marker='o', label='Vanilla')
         plt.plot(test_set_multiple_range, errors_first_interior, marker='o', label='First Order')
         plt.plot(test_set_multiple_range, errors_second_interior, marker='o', label='Second Order')
-        plt.plot(test_set_multiple_range, errors_diffeo_interior, marker='o', label='Diffeo')
+        # plt.plot(test_set_multiple_range, errors_diffeo_interior, marker='o', label='Diffeo')
         plt.xlabel('Test Set Subset Size')
         plt.ylabel('Interior Rec. Loss')
-        plt.title('Reconstruction Loss - Interior')
+        plt.title(penalty+ 'Loss - Interior')
         plt.legend()
 
         plt.subplot(3, 2, 2)
         plt.plot(epsilons, errors_vanilla_boundary, marker='o', label='Vanilla')
         plt.plot(epsilons, errors_first_boundary, marker='o', label='First Order')
         plt.plot(epsilons, errors_second_boundary, marker='o', label='Second Order')
-        plt.plot(epsilons, errors_diffeo_boundary, marker='o', label='Diffeo')
+        # plt.plot(epsilons, errors_diffeo_boundary, marker='o', label='Diffeo')
         plt.xlabel('Epsilon')
         plt.ylabel('Boundary Rec. Loss')
-        plt.title('Reconstruction Loss - Boundary')
+        plt.title(penalty+' Loss - Boundary')
         plt.legend()
 
         # Row 2: Diffusion Loss
@@ -463,7 +493,7 @@ if __name__ == "__main__":
         plt.plot(test_set_multiple_range, errors_vanilla_diff_interior, marker='o', label='Vanilla')
         plt.plot(test_set_multiple_range, errors_first_diff_interior, marker='o', label='First Order')
         plt.plot(test_set_multiple_range, errors_second_diff_interior, marker='o', label='Second Order')
-        plt.plot(test_set_multiple_range, errors_diffeo_diff_interior, marker='o', label='Diffeo')
+        # plt.plot(test_set_multiple_range, errors_diffeo_diff_interior, marker='o', label='Diffeo')
         plt.plot(test_set_multiple_range, errors_ambient_diffusion_interior, marker='o', label='Ambient model')
         plt.xlabel('Test Set Subset Size')
         plt.ylabel('Interior Cov. Loss')
@@ -474,7 +504,7 @@ if __name__ == "__main__":
         plt.plot(epsilons, errors_vanilla_diff_boundary, marker='o', label='Vanilla')
         plt.plot(epsilons, errors_first_diff_boundary, marker='o', label='First Order')
         plt.plot(epsilons, errors_second_diff_boundary, marker='o', label='Second Order')
-        plt.plot(epsilons, errors_diffeo_diff_boundary, marker='o', label='Diffeo')
+        # plt.plot(epsilons, errors_diffeo_diff_boundary, marker='o', label='Diffeo')
         plt.plot(epsilons, errors_ambient_diffusion_boundary, marker='o', label='Ambient')
         plt.xlabel('Epsilon')
         plt.ylabel('Boundary Cov. Loss')
@@ -486,7 +516,7 @@ if __name__ == "__main__":
         plt.plot(test_set_multiple_range, errors_vanilla_drift_interior, marker='o', label='Vanilla')
         plt.plot(test_set_multiple_range, errors_first_drift_interior, marker='o', label='First Order')
         plt.plot(test_set_multiple_range, errors_second_drift_interior, marker='o', label='Second Order')
-        plt.plot(test_set_multiple_range, errors_diffeo_drift_interior, marker='o', label='Diffeo')
+        # plt.plot(test_set_multiple_range, errors_diffeo_drift_interior, marker='o', label='Diffeo')
         plt.plot(test_set_multiple_range, errors_ambient_drift_interior, marker='o', label='Ambient')
         plt.xlabel('Test Set Subset Size')
         plt.ylabel('Interior Drift Loss')
@@ -497,7 +527,7 @@ if __name__ == "__main__":
         plt.plot(epsilons, errors_vanilla_drift_boundary, marker='o', label='Vanilla')
         plt.plot(epsilons, errors_first_drift_boundary, marker='o', label='First Order')
         plt.plot(epsilons, errors_second_drift_boundary, marker='o', label='Second Order')
-        plt.plot(epsilons, errors_diffeo_drift_boundary, marker='o', label='Diffeo')
+        # plt.plot(epsilons, errors_diffeo_drift_boundary, marker='o', label='Diffeo')
         plt.plot(epsilons, errors_ambient_drift_boundary, marker='o', label='Ambient')
         plt.xlabel('Epsilon')
         plt.ylabel('Boundary Drift Loss')
@@ -506,6 +536,7 @@ if __name__ == "__main__":
 
         plt.tight_layout()
         plt.show()
+        save_plot(fig, exp_dir, plot_name="int_vs_bd_errors")
 
 
         # Plot SDEs
@@ -537,17 +568,27 @@ if __name__ == "__main__":
             ax.plot3D(basic_ambient_paths[i, :, 0], basic_ambient_paths[i, :, 1], basic_ambient_paths[i, :, 2],
                       c="red",
                       alpha=0.8)
-        ae_diffusion_first.autoencoder.plot_surface(-1, 1, grid_size=30, ax=ax, title="Reconstruction")
+        ae_diffusion_second.autoencoder.plot_surface(-1, 1, grid_size=30, ax=ax, title="Reconstruction")
         # Create legend handles
         legend_elements = [
             Line2D([0], [0], color="black", lw=2, label="True Path"),
-            Line2D([0], [0], color="blue", lw=2, label="AE-Local SDE model Path"),
+            Line2D([0], [0], color="blue", lw=2, label="2nd-order AE-SDE Path"),
             Line2D([0], [0], color="red", lw=2, label="Ambient SDE model Path")
         ]
 
         # Add legend
         ax.legend(handles=legend_elements, loc="best")
         plt.show()
+        save_plot(fig, exp_dir, plot_name="model_sample_paths_surface")
 
     compute_and_plot_errors(False)
-    compute_and_plot_errors(True)
+
+    torch.save(ae_diffusion_vanilla.state_dict(), os.path.join(exp_dir, "ae_diffusion_vanilla.pth"))
+    torch.save(ae_diffusion_first.state_dict(), os.path.join(exp_dir, "ae_diffusion_first.pth"))
+    torch.save(ae_diffusion_second.state_dict(), os.path.join(exp_dir, "ae_diffusion_second.pth"))
+    # torch.save(ae_diffusion_diffeo.state_dict(), os.path.join(exp_dir, "ae_diffusion_diffeo.pth"))
+
+    torch.save(ambient_drift.state_dict(), os.path.join(exp_dir, "ambient_drift.pth"))
+    torch.save(ambient_diffusion.state_dict(), os.path.join(exp_dir, "ambient_diffusion.pth"))
+
+    print("Models successfully saved.")

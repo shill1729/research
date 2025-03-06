@@ -53,6 +53,11 @@ class DynamicsBase(ABC):
         """
         pass
 
+    @abstractmethod
+    def name(self):
+        "Name of the process"
+        pass
+
 
 # Specific Dynamics Implementations
 
@@ -63,6 +68,9 @@ class BrownianMotion(DynamicsBase):
     def diffusion(self, manifold=None):
         return sp.Matrix([[1, 0], [0, 1]])
 
+    def name(self):
+        return "bm"
+
 
 class RiemannianBrownianMotion(DynamicsBase):
     def drift(self, manifold: RiemannianManifold):
@@ -70,6 +78,9 @@ class RiemannianBrownianMotion(DynamicsBase):
 
     def diffusion(self, manifold: RiemannianManifold):
         return manifold.local_bm_diffusion()
+
+    def name(self):
+        return "rbm"
 
 
 class LangevinDoubleWell(DynamicsBase):
@@ -83,10 +94,13 @@ class LangevinDoubleWell(DynamicsBase):
     def diffusion(self, manifold: RiemannianManifold):
         return manifold.local_bm_diffusion()
 
+    def name(self):
+        return "langevin_doublewell"
+
 
 class LangevinHarmonicOscillator(DynamicsBase):
     def drift(self, manifold: RiemannianManifold):
-        harmonic_potential = sp.Matrix([
+        harmonic_potential = 0.1 * sp.Matrix([
             self.u,
             self.v
         ])
@@ -95,10 +109,13 @@ class LangevinHarmonicOscillator(DynamicsBase):
     def diffusion(self, manifold: RiemannianManifold):
         return manifold.local_bm_diffusion()
 
+    def name(self):
+        return "langevin_harmonic"
+
 
 class LangevinGaussianWell(DynamicsBase):
     def drift(self, manifold: RiemannianManifold):
-        gaussian_well_potential = sp.Matrix([
+        gaussian_well_potential = 5. * sp.Matrix([
             -2 * self.u * sp.exp(-self.u ** 2 - self.v ** 2),
             -2 * self.v * sp.exp(-self.u ** 2 - self.v ** 2)
         ])
@@ -107,10 +124,13 @@ class LangevinGaussianWell(DynamicsBase):
     def diffusion(self, manifold: RiemannianManifold):
         return manifold.local_bm_diffusion()
 
+    def name(self):
+        return "langevin_gaussianbump"
+
 
 class LangevinMorsePotential(DynamicsBase):
     def drift(self, manifold: RiemannianManifold):
-        morse_potential = sp.Matrix([
+        morse_potential = 5. * sp.Matrix([
             2 * self.u * (1 - sp.exp(-self.u)) * sp.exp(-self.u),
             2 * self.v * (1 - sp.exp(-self.v)) * sp.exp(-self.v)
         ])
@@ -118,6 +138,9 @@ class LangevinMorsePotential(DynamicsBase):
 
     def diffusion(self, manifold: RiemannianManifold):
         return manifold.local_bm_diffusion()
+
+    def name(self):
+        return "langevin_morse"
 
 
 class LangevinGravitationalPotential(DynamicsBase):
@@ -131,6 +154,9 @@ class LangevinGravitationalPotential(DynamicsBase):
     def diffusion(self, manifold: RiemannianManifold):
         return manifold.local_bm_diffusion()
 
+    def name(self):
+        return "langevin_gravity"
+
 
 class LangevinChemicalReactionPotential(DynamicsBase):
     def drift(self, manifold: RiemannianManifold):
@@ -143,19 +169,25 @@ class LangevinChemicalReactionPotential(DynamicsBase):
     def diffusion(self, manifold: RiemannianManifold):
         return manifold.local_bm_diffusion()
 
+    def name(self):
+        return "langevin_chem"
+
 
 class ArbitraryMotion(DynamicsBase):
     def drift(self, manifold=None):
         return sp.Matrix([
             -5 * (self.u - 0.5),
             5 * (self.u - 1)
-        ]) / 2
+        ]) / 6
 
     def diffusion(self, manifold=None):
         return sp.Matrix([
             [0.1 * sp.sin(self.u) + self.v ** 2, 0.05 * sp.cos(self.v) + self.u],
             [0.02 * self.u * self.v, 0.1 + 0.1 * self.v]
         ]) / 5
+
+    def name(self):
+        return "arbitrary1"
 
 
 class ArbitraryMotion2(DynamicsBase):
@@ -163,13 +195,16 @@ class ArbitraryMotion2(DynamicsBase):
         return sp.Matrix([
             -self.v,
             self.u
-        ]) / 2
+        ]) / 10
 
     def diffusion(self, manifold=None):
         return sp.Matrix([
             [0.1 * sp.sin(self.u) + self.v ** 2, 0.05 * sp.cos(self.v) + self.u],
             [0.02 * self.u * self.v, 0.1 + 0.1 * self.v]
-        ]) / 5
+        ]) / 10
+
+    def name(self):
+        return "arbitrary2"
 
 
 class AnisotropicDynamics(DynamicsBase):
@@ -215,3 +250,6 @@ class AnisotropicDynamics(DynamicsBase):
             [self.u, 1 + self.v]
         ])
         return diffusion
+
+    def name(self):
+        return "anisotropic"

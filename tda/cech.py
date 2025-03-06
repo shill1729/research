@@ -1,10 +1,10 @@
 # === Čech Complex Builder ===
-import itertools
 
 import numpy as np
 from scipy.spatial import cKDTree
-
-from tda.intersection_solver import ellipsoidal_intersection
+import itertools
+import matplotlib.pyplot as plt
+from tda.solvers.intersection_solver import ellipsoidal_intersection,minimize_K
 
 
 def build_cech_complex(points, A_list, eps, k_nn=20, max_dim=3):
@@ -81,7 +81,7 @@ def build_cech_complex(points, A_list, eps, k_nn=20, max_dim=3):
 
 # === Example Test Function ===
 
-def test_cech_complex():
+def test_cech_complex1():
     import matplotlib.pyplot as plt
 
     # Generate a random 2D point cloud.
@@ -93,7 +93,7 @@ def test_cech_complex():
     A_list = [np.eye(2) for _ in range(n)]
 
     # Choose a scale parameter (ball radius) ε.
-    eps = 2
+    eps = 0.2
 
     # Build the Čech complex using only the 10 nearest neighbors (to keep the search local)
     cech_complex = build_cech_complex(points, A_list, eps, k_nn=10, max_dim=3)
@@ -115,14 +115,8 @@ def test_cech_complex():
     plt.show()
 
 
-if __name__ == '__main__':
-    test_cech_complex()
-import numpy as np
-from scipy.optimize import minimize
-from scipy.spatial import cKDTree
-import itertools
-import matplotlib.pyplot as plt
-from tda.intersection_solver import ellipsoidal_intersection,minimize_K,compute_K
+
+
 
 def compute_birth_epsilon(xs, A_list):
     """
@@ -266,4 +260,5 @@ def test_cech_complex():
     plot_barcode(persistence_0d)
 
 if __name__ == '__main__':
+    test_cech_complex1()
     test_cech_complex()

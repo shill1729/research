@@ -9,7 +9,7 @@ from ae.toydata.pointclouds import PointCloud
 from ae.toydata.local_dynamics import BrownianMotion
 from ae.toydata.surfaces import Sphere
 from ae.utils import compute_orthogonal_projection_from_cov
-from tda.intersection_solver import minimize_K, compute_K
+from tda.solvers.intersection_solver import minimize_K
 
 
 # -------------------------------
@@ -234,4 +234,4 @@ def empirical_runtime_on_point_cloud(n=30, eps=0.5, max_plots=6):
 
 if __name__ == '__main__':
     # Run the empirical timing and plotting tests on the Riemannian point cloud.
-    empirical_runtime_on_point_cloud(n=50, eps=0.5, max_plots=6)
+    empirical_runtime_on_point_cloud(n=10, eps=0.5, max_plots=6)
