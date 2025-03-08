@@ -2,39 +2,20 @@ from ae.experiments.datagen import ToyData
 from ae.experiments.training import Trainer
 from ae.experiments.pathgen import SamplePathGenerator
 from ae.experiments.path_plotting import SamplePathPlotter
-
+from ae.experiments.path_computations import *
+from ae.experiments.helpers import get_time_horizon_name
 import numpy as np
 
 
 class DynamicsError:
-    def __init__(self, toydata: ToyData, trainer: Trainer):
+    def __init__(self, toydata: ToyData, trainer: Trainer, tn: float):
         self.toydata = toydata
         self.trainer = trainer
         self.sample_path_generator = SamplePathGenerator(self.toydata, self.trainer)
-        self.sample_path_plotter = SamplePathPlotter(self.toydata, self.trainer)
+        self.sample_path_plotter = SamplePathPlotter(self.toydata, self.trainer, tn)
 
-    def get_time_horizon_name(self, tn):
-        """
-        Determine the time horizon category based on tn value
-
-        Args:
-            tn (float): Maximum time horizon
-
-        Returns:
-            str: Time horizon category name
-        """
-        if tn <= 0.01:
-            return "/very_short_term/"
-        elif 0.01 < tn <= 0.05:
-            return "/short_term/"
-        elif 0.05 < tn <= 0.8:
-            return "/medium_term/"
-        elif 0.8 < tn <= 5.0:
-            return "/long_term/"
-        else:
-            return "/very_long_term/"
-
-    def get_optimal_ntime(self, tn):
+    @staticmethod
+    def get_optimal_ntime(tn):
         """
         Determine the optimal number of time steps based on time horizon
 
@@ -69,103 +50,163 @@ class DynamicsError:
         p = np.abs(self.toydata.point_cloud.np_phi(*[x[0], x[1]])[2] - x[2])
         return p
 
-    def compute_conditional_expectation(self, ensemble_at_t, f):
+    def chart_error_vectorized(self, paths):
         """
-        Compute the conditional expectation of a function over an ensemble at a specific time
+        Vectorized version of chart_error for ensemble paths
 
         Args:
-            ensemble_at_t (numpy.ndarray): Ensemble states at time t
-            f (function): Function to evaluate
+            paths (numpy.ndarray): Ensemble paths of shape (n_ensemble, n_time, n_dim)
 
         Returns:
-            float: Mean function value
+            numpy.ndarray: Error values of shape (n_ensemble, n_time)
         """
-        return np.mean([f(x) for x in ensemble_at_t])
+        # Extract individual coordinates for vectorized computation
+        x_coords = paths[:, :, 0]  # Shape: (n_ensemble, n_time)
+        y_coords = paths[:, :, 1]  # Shape: (n_ensemble, n_time)
+        z_coords = paths[:, :, 2]  # Shape: (n_ensemble, n_time)
 
-    def compute_confidence_intervals(self, ensemble, f):
-        """
-        Compute mean and confidence intervals (standard error of the mean) over ensemble paths
+        n_ensemble, n_time = x_coords.shape
+        errors = np.zeros((n_ensemble, n_time))
 
-        Args:
-            ensemble (numpy.ndarray): Ensemble paths
-            f (function): Function to evaluate
-
-        Returns:
-            tuple: (means, standard_errors)
-        """
-        ntime = ensemble.shape[1]
-        means = np.zeros(ntime)
-        std_errors = np.zeros(ntime)
-
-        for t in range(ntime):
-            values = np.array([f(x) for x in ensemble[:, t, :]])
-            means[t] = np.mean(values)
-            std_errors[t] = np.std(values) / np.sqrt(len(values))  # Standard error of the mean
-        return means, std_errors
+        # Compute errors for each point in the ensemble
+        for i in range(n_ensemble):
+            for t in range(n_time):
+                expected_z = self.toydata.point_cloud.np_phi(x_coords[i, t], y_coords[i, t])[2]
+                errors[i, t] = np.abs(expected_z - z_coords[i, t])
+        return errors
 
     def get_standard_test_functions(self):
         """
         Return a list of standard test functions for evaluating dynamics
 
         Returns:
-            list: List of (name, function) tuples
+            list: List of (function name, vectorized function) tuples
         """
         return [
-            ("l2 norm", lambda x: np.linalg.norm(x)),
-            ("l1 norm", lambda x: np.sum(np.abs(x))),
-            ("1st", lambda x: x[0]),
-            ("2nd", lambda x: x[1]),
-            ("3rd", lambda x: x[2]),
-            ("Manifold constr", lambda x: self.chart_error(x))
+            ("l2 norm", lambda paths: np.linalg.vector_norm(paths, axis=2, ord=2)),
+            ("polynomial", lambda paths: paths[:, :, 0]**2-paths[:, :, 1]*paths[:, :, 2]),
+            ("5th degree", lambda paths: paths[:, :, 0]-paths[:, :, 1]**5),
+            ("sin(x1)x3", lambda paths: np.sin(4*paths[:, :, 1])*paths[:, :, 2]),
+            ("rational function", lambda paths: paths[:, :, 2]/(1+paths[:, :, 1]**2+paths[:, :, 0]**2)),
+            ("Manifold constraint", self.chart_error_vectorized)
         ]
 
-    def analyze_statistical_properties(self, tn, npaths=1000, seed=None):
+    def analyze_statistical_properties(self, paths_ground_truth, paths_ambient, paths_ae, tn):
         """
-        Analyze statistical properties of paths for different models
+        Analyze statistical properties of paths for different models using vectorized operations
 
         Args:
+            paths_ground_truth (numpy.ndarray): Ground truth paths of shape (n_ensemble, n_time, n_dim)
+            paths_ambient (numpy.ndarray): Ambient model paths of shape (n_ensemble, n_time, n_dim)
+            paths_ae (dict): Dictionary of autoencoder paths, each of shape (n_ensemble, n_time, n_dim)
             tn (float): Maximum time horizon
-            npaths (int, optional): Number of sample paths per model
-            seed (int, optional): Random seed for reproducibility
 
         Returns:
             dict: Dictionary containing time series results
         """
-        # Determine appropriate number of time steps
-        ntime = self.get_optimal_ntime(tn)
-        time_horizon = self.get_time_horizon_name(tn)
-        time_grid = np.linspace(0, tn, ntime + 1)
+        n = paths_ground_truth.shape[0]
+        # Get time horizon name
+        time_horizon = get_time_horizon_name(tn)
+        ntime = paths_ambient.shape[1]
+        time_grid = np.linspace(0, tn, ntime)
 
-        # Generate paths
-        paths_ground_truth, paths_ambient, paths_ae, local_gt, local_aes = (
-            self.sample_path_generator.generate_paths(tn, ntime, npaths, seed))
+        # Initialize results dictionaries for standard statistical measures
+        means_gt, means_amb, means_ae = compute_mean_sample_paths(
+            paths_ground_truth, paths_ambient, paths_ae)
 
-        # Initialize results dictionaries
-        f_functions = self.get_standard_test_functions()
-        results_time = {fname: {} for fname, _ in f_functions}
-        results_conf_intervals = {fname: {} for fname, _ in f_functions}
+        vars_gt, vars_amb, vars_ae = compute_variance_sample_paths(
+            paths_ground_truth, paths_ambient, paths_ae)
 
-        # Compute statistics for each test function
-        for fname, f in f_functions:
-            # Ground truth
-            results_time[fname]["Ground Truth"], results_conf_intervals[fname]["Ground Truth"] = \
-                self.compute_confidence_intervals(paths_ground_truth, f)
+        covs_gt, covs_amb, covs_ae = compute_covariance_sample_paths(
+            paths_ground_truth, paths_ambient, paths_ae)
 
-            # Ambient model
-            results_time[fname]["Ambient"], results_conf_intervals[fname]["Ambient"] = \
-                self.compute_confidence_intervals(paths_ambient, f)
+        increments_gt, increments_amb, increments_ae = compute_increments(
+            paths_ground_truth, paths_ambient, paths_ae)
 
-            # Autoencoder models
-            for name, paths in paths_ae.items():
-                results_time[fname][name], results_conf_intervals[fname][name] = \
-                    self.compute_confidence_intervals(paths, f)
+        norms_gt, norms_amb, norms_ae = compute_norms(
+            paths_ground_truth, paths_ambient, paths_ae)
+
+        # Process standard test functions using vectorized operations
+        standard_test_results = {}
+        conf_intervals_results = {}
+
+        for fname, f_vec in self.get_standard_test_functions():
+            # Apply the vectorized function to get values for all paths at all times
+            gt_values, amb_values, ae_values = apply_function(
+                paths_ground_truth, paths_ambient, paths_ae, f_vec)
+
+            # Calculate means over ensemble dimension (axis=0)
+            f_gt_means, f_amb_means, f_ae_means = compute_mean_sample_paths(gt_values, amb_values, ae_values)
+
+            # Calculate standard errors of the mean (SEM)
+            gt_sem, amb_sem, ae_sem = apply_function(gt_values, amb_values, ae_values,
+                                                     lambda x: np.std(x, axis=0)/np.sqrt(n))
+
+            # Store results
+            standard_test_results[fname] = {
+                "Ground Truth": f_gt_means,
+                "Ambient Model": f_amb_means,
+                **f_ae_means
+            }
+
+            conf_intervals_results[fname] = {
+                "Ground Truth": gt_sem,
+                "Ambient Model": amb_sem,
+                **ae_sem
+            }
+
+        # Prepare additional advanced statistics
+        # Feynman-Kac formulas for specific examples
+        fk_l2 = feynman_kac_formula(
+            paths_ground_truth, paths_ambient, paths_ae,
+            lambda x: x[:, :, 0]**2-x[:, :, 1])
+
+        fk_coord1 = feynman_kac_formula(
+            paths_ground_truth, paths_ambient, paths_ae,
+            lambda x: x[:, :, 0] ** 2)
 
         return {
             "time_grid": time_grid,
-            "results_time": results_time,
-            "results_conf_intervals": results_conf_intervals,
+            "time_horizon": time_horizon,
             "paths_ground_truth": paths_ground_truth,
             "paths_ambient": paths_ambient,
             "paths_ae": paths_ae,
-            "time_horizon": time_horizon
+
+            # Standard statistics
+            "means": {
+                "Ground Truth": means_gt,
+                "Ambient": means_amb,
+                **means_ae
+            },
+            "variances": {
+                "Ground Truth": vars_gt,
+                "Ambient": vars_amb,
+                **vars_ae
+            },
+            "covariances": {
+                "Ground Truth": covs_gt,
+                "Ambient": covs_amb,
+                **covs_ae
+            },
+            "increments": {
+                "Ground Truth": increments_gt,
+                "Ambient": increments_amb,
+                **increments_ae
+            },
+            "norms": {
+                "Ground Truth": norms_gt,
+                "Ambient": norms_amb,
+                **norms_ae
+            },
+
+            # Results from standard test functions
+            "results_time": standard_test_results,
+            "results_conf_intervals": conf_intervals_results,
+
+            # Advanced statistics (Feynman-Kac examples)
+            "feynman_kac": {
+                "l2_squared": fk_l2,
+                "first_coord_squared": fk_coord1
+            }
         }
+

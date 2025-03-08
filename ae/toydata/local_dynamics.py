@@ -86,9 +86,9 @@ class RiemannianBrownianMotion(DynamicsBase):
 class LangevinDoubleWell(DynamicsBase):
     def drift(self, manifold: RiemannianManifold):
         double_well_potential = sp.Matrix([
-            4 * self.u * (self.u ** 2 - 1),
+            4 * self.u * (self.u ** 2 - 0.5),
             2 * self.v
-        ]) / 4
+        ])/4
         return -0.5 * manifold.metric_tensor().inv() * double_well_potential + manifold.local_bm_drift()
 
     def diffusion(self, manifold: RiemannianManifold):
@@ -100,7 +100,7 @@ class LangevinDoubleWell(DynamicsBase):
 
 class LangevinHarmonicOscillator(DynamicsBase):
     def drift(self, manifold: RiemannianManifold):
-        harmonic_potential = 0.1 * sp.Matrix([
+        harmonic_potential = 2. * sp.Matrix([
             self.u-0.5,
             self.v-0.5
         ])

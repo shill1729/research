@@ -2,6 +2,27 @@ import os
 import json
 from datetime import datetime
 
+def get_time_horizon_name(tn):
+    """
+    Determine the time horizon category based on tn value
+
+    Args:
+        tn (float): Maximum time horizon
+
+    Returns:
+        str: Time horizon category name
+    """
+    if tn <= 0.01:
+        return "/very_short_term/"
+    elif 0.01 < tn <= 0.25:
+        return "/short_term/"
+    elif 0.25 < tn <= 0.75:
+        return "/medium_term/"
+    elif 0.75 < tn <= 1.:
+        return "/long_term/"
+    else:
+        return "/very_long_term/"
+
 
 def save_plot(fig, exp_dir, plot_name):
     """Save a matplotlib figure in the experiment directory."""

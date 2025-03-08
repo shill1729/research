@@ -112,7 +112,7 @@ class Torus(SurfaceBase):
 
 
 class Paraboloid(SurfaceBase):
-    def __init__(self, a=1, b=1):
+    def __init__(self, a=5, b=5):
         super().__init__()
         self.a = a
         self.b = b
@@ -129,7 +129,7 @@ class Paraboloid(SurfaceBase):
 
 
 class ProductSurface(SurfaceBase):
-    def __init__(self, a=1):
+    def __init__(self, a=4):
         super().__init__()
         self.a = a
 
@@ -145,7 +145,7 @@ class ProductSurface(SurfaceBase):
 
 
 class HyperbolicParaboloid(SurfaceBase):
-    def __init__(self, a=1, b=1):
+    def __init__(self, a=4, b=4):
         super().__init__()
         self.a = a
         self.b = b
@@ -159,7 +159,6 @@ class HyperbolicParaboloid(SurfaceBase):
 
     def name(self):
         return "hyperbolic_paraboloid"
-
 
 
 class Sphere(SurfaceBase):

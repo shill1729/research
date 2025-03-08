@@ -14,8 +14,7 @@ class GeometryError:
     def __init__(self, toydata: ToyData, trainer: Trainer,
                  eps_max=1., device="cpu"):
         self.toydata = toydata
-        # TODO: change ae_list to ae_dict
-        self.ae_list = trainer.models
+        self.ae_dict = trainer.models
         self.ambient_drift_loss = AmbientDriftLoss()
         self.ambient_diffusion_loss = AmbientDiffusionLoss()
         self.eps_max = eps_max
@@ -93,15 +92,15 @@ class GeometryError:
             "diffeomorphism loss"
         ]
 
-        model_loss_storage = {name: {lk: [] for lk in loss_keys} for name in self.ae_list.keys()}
-        model_drift_losses = {name: [] for name in self.ae_list.keys()}
-        model_diffusion_losses = {name: [] for name in self.ae_list.keys()}
+        model_loss_storage = {name: {lk: [] for lk in loss_keys} for name in self.ae_dict.keys()}
+        model_drift_losses = {name: [] for name in self.ae_dict.keys()}
+        model_diffusion_losses = {name: [] for name in self.ae_dict.keys()}
         ambient_drift_losses = []
         ambient_diffusion_losses = []
 
         # Not sure why this isnt working
         # interior_mask = self.is_interior_local(local_x_test_full, self.toydata.surface.bounds())
-        # for name, model in self.ae_list.items():
+        # for name, model in self.ae_dict.items():
         #     x_test = x_test_full[interior_mask]
         #     mu_test = mu_test_full[interior_mask]
         #     cov_test = cov_test_full[interior_mask]
@@ -123,7 +122,7 @@ class GeometryError:
             interior_mask = self.is_interior_local(local_x_test, self.toydata.surface.bounds())
             boundary_mask = ~interior_mask
             # TODO: compute interior loss just once. maybe outside this loop? just masking
-            for name, model in self.ae_list.items():
+            for name, model in self.ae_dict.items():
                 losses = self.subset_error(boundary_mask, model, x_test, mu_test, cov_test, p_test, h_test)
                 if losses is not None:
                     losses_subset, drift_loss, diffusion_loss, ambient_drift_loss, ambient_diff_loss = losses
@@ -134,7 +133,7 @@ class GeometryError:
                     model_drift_losses[name].append(drift_loss)
                     model_diffusion_losses[name].append(diffusion_loss)
 
-                    if name == list(self.ae_list.keys())[0]:
+                    if name == list(self.ae_dict.keys())[0]:
                         ambient_drift_losses.append(ambient_drift_loss)
                         ambient_diffusion_losses.append(ambient_diff_loss)
                 else:
@@ -142,14 +141,14 @@ class GeometryError:
                         model_loss_storage[name][key].append(np.nan)
                     model_drift_losses[name].append(np.nan)
                     model_diffusion_losses[name].append(np.nan)
-                    if name == list(self.ae_list.keys())[0]:
+                    if name == list(self.ae_dict.keys())[0]:
                         ambient_drift_losses.append(np.nan)
                         ambient_diffusion_losses.append(np.nan)
 
         # Regular loss plots
         for key in loss_keys:
             fig = plt.figure()
-            for name in self.ae_list.keys():
+            for name in self.ae_dict.keys():
                 plt.plot(epsilons, model_loss_storage[name][key], label=name)
             plt.xlabel('Epsilon')
             plt.ylabel(key)
@@ -160,7 +159,7 @@ class GeometryError:
 
         # Drift Loss Plot
         fig = plt.figure()
-        for name in self.ae_list.keys():
+        for name in self.ae_dict.keys():
             plt.plot(epsilons, model_drift_losses[name], label=f"{name} drift loss")
         plt.plot(epsilons, ambient_drift_losses, linestyle="--", label="Ambient drift loss", color="black")
         plt.xlabel("Epsilon")
@@ -172,7 +171,7 @@ class GeometryError:
 
         # Diffusion Loss Plot
         fig = plt.figure()
-        for name in self.ae_list.keys():
+        for name in self.ae_dict.keys():
             plt.plot(epsilons, model_diffusion_losses[name], label=f"{name} diffusion loss")
         plt.plot(epsilons, ambient_diffusion_losses, linestyle="--", label="Ambient diffusion loss", color="black")
         plt.xlabel("Epsilon")
