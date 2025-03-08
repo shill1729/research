@@ -101,13 +101,13 @@ class LangevinDoubleWell(DynamicsBase):
 class LangevinHarmonicOscillator(DynamicsBase):
     def drift(self, manifold: RiemannianManifold):
         harmonic_potential = 0.1 * sp.Matrix([
-            self.u,
-            self.v
+            self.u-0.5,
+            self.v-0.5
         ])
         return -0.5 * manifold.metric_tensor().inv() * harmonic_potential + manifold.local_bm_drift()
 
     def diffusion(self, manifold: RiemannianManifold):
-        return manifold.local_bm_diffusion()
+        return manifold.local_bm_diffusion()/5
 
     def name(self):
         return "langevin_harmonic"
@@ -229,7 +229,7 @@ class AnisotropicDynamics(DynamicsBase):
             -self.u * (1 - self.u ** 2 - self.v ** 2),
             -self.v * (1 - self.u ** 2 - self.v ** 2)
         ])
-        return drift
+        return drift/100
 
     def diffusion(self, manifold=None):
         """
@@ -249,7 +249,7 @@ class AnisotropicDynamics(DynamicsBase):
             [1 + self.u, self.v],
             [self.u, 1 + self.v]
         ])
-        return diffusion
+        return diffusion/100
 
     def name(self):
         return "anisotropic"

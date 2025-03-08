@@ -26,13 +26,14 @@ def time_intersection_tests(n, eps=0.5, solver="SLSQP"):
     start_pairs = time.perf_counter()
     for i, j in itertools.combinations(range(n), 2):
         pts = np.array([x[i], x[j]])
-        # As = [A_list[i], A_list[j]]
         As = np.array([A_list[i], A_list[j]])
-        print(As.shape)
-        if solver != "CS" and solver != "pga":
+
+        if solver != "cs" and solver != "pga":
             _ = minimize_K(eps, pts, A_array=As, solver=solver)
-        else:
+        elif solver == "cs":
             _ = cauchy_simplex_solver(eps, pts, A_list=As)
+        elif solver == "pga":
+            _ = projected_gradient_descent(eps, pts, As)
         pair_count += 1
     end_pairs = time.perf_counter()
     pair_time = end_pairs - start_pairs
@@ -43,10 +44,10 @@ def time_intersection_tests(n, eps=0.5, solver="SLSQP"):
     for i, j, k in itertools.combinations(range(n), 3):
         pts = np.array([x[i], x[j], x[k]])
         As = np.array([A_list[i], A_list[j], A_list[k]])
-        print(As.shape)
-        if solver != "CS" and solver != "pga":
+
+        if solver != "cs" and solver != "pga":
             _ = minimize_K(eps, pts, A_array=As, solver=solver)
-        elif solver == "CS":
+        elif solver == "cs":
             _ = cauchy_simplex_solver(eps, pts, A_list=As)
         elif solver == "pga":
             _ = projected_gradient_descent(eps, pts, As)
@@ -83,7 +84,7 @@ def main():
     # Define a list of n values. Be cautious: triple tests scale as O(n^3)
     n_values = [5, 10]
     # The only relevant ones are SLSQP, trust_constr, and COB-...
-    solvers = ["SLSQP"]
+    solvers = ["SLSQP", "cs"]
     pair_times = np.zeros((len(n_values), len(solvers)))
     triple_times = np.zeros((len(n_values), len(solvers)))
     print("Measuring runtimes for intersection tests:")

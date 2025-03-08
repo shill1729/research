@@ -1,0 +1,184 @@
+import torch
+import numpy as np
+import matplotlib.pyplot as plt
+
+from ae.experiments.datagen import ToyData
+from ae.models.local_neural_sdes import AutoEncoderDiffusion
+from ae.models.losses import TotalLoss, AmbientDriftLoss, AmbientDiffusionLoss, LossWeights
+from ae.models.ambient_sdes import AmbientDriftNetwork, AmbientDiffusionNetwork
+from ae.utils.performance_analysis import compute_test_losses
+from ae.experiments.helpers import save_plot
+from ae.experiments.training import Trainer
+
+class GeometryError:
+    def __init__(self, toydata: ToyData, trainer: Trainer,
+                 eps_max=1., device="cpu"):
+        self.toydata = toydata
+        # TODO: change ae_list to ae_dict
+        self.ae_list = trainer.models
+        self.ambient_drift_loss = AmbientDriftLoss()
+        self.ambient_diffusion_loss = AmbientDiffusionLoss()
+        self.eps_max = eps_max
+        self.device = device
+        self.ae_loss = TotalLoss(LossWeights())
+        self.ambient_drift = trainer.ambient_drift
+        self.ambient_diffusion = trainer.ambient_diffusion
+        self.trainer = trainer
+
+    def generate_test_data(self, epsilon=1., n=1000, test_seed=None, device="cpu"):
+        self.toydata.set_point_cloud(epsilon, True)
+        return self.toydata.generate_data(n, 2, test_seed, device)
+
+    def compute_ambient_diff_and_drift(self,
+                                       drift_model: AmbientDriftNetwork,
+                                       diffusion_model: AmbientDiffusionNetwork,
+                                       x_subset, cov_subset, mu_subset):
+        # Comment this and use it if you want to use local.
+        # z_subset = aedf.autoencoder.encoder(x_subset)
+        mu_loss = self.ambient_drift_loss.forward(drift_model, x_subset, mu_subset).item()
+        sigma_loss = self.ambient_diffusion_loss.forward(diffusion_model, x_subset, cov_subset).item()
+        return mu_loss, sigma_loss
+
+    def compute_our_ambient_diff_and_drift(self, aedf: AutoEncoderDiffusion, x_subset, cov_subset, mu_subset):
+        # Compute model diffusion loss
+        mu_model = aedf.compute_ambient_drift(x_subset)
+        cov_model = aedf.compute_ambient_covariance(x_subset)
+        mu_loss = torch.mean(torch.linalg.vector_norm(mu_model - mu_subset, ord=2, dim=1) ** 2)
+        cov_loss = torch.mean(torch.linalg.matrix_norm(cov_model - cov_subset, ord="fro") ** 2)
+        return mu_loss.item(), cov_loss.item()
+
+    # -------------------------------------
+    # Helper: determine which test samples are in the interior (training domain)
+    # -------------------------------------
+    def is_interior_local(self, local_coords: torch.Tensor, bounds_list):
+        interior_mask = torch.ones(local_coords.shape[0], dtype=torch.bool, device=local_coords.device)
+        for i, (low, high) in enumerate(bounds_list):
+            interior_mask = interior_mask & (local_coords[:, i] >= low) & (local_coords[:, i] <= high)
+        interior_mask = torch.tensor(interior_mask.detach().numpy(), dtype=torch.bool)
+        return interior_mask.detach()
+
+    def subset_error(self, mask,
+                     model: AutoEncoderDiffusion,
+                     x_test, mu_test, cov_test, p_test, h_test):
+        if torch.any(mask):
+            x_bnd = x_test[mask]
+            p_bnd = p_test[mask]
+            frame_bnd = h_test[mask]
+            cov_bnd = cov_test[mask]
+            mu_bnd = mu_test[mask]
+            losses_subset = compute_test_losses(model,
+                                                self.ae_loss,
+                                                x_bnd, p_bnd, frame_bnd, cov_bnd, mu_bnd,
+                                                device=self.device)
+            drift_loss, diffusion_loss = self.compute_our_ambient_diff_and_drift(model, x_bnd, cov_bnd, mu_bnd)
+            ambient_drift_loss, ambient_diff_loss = self.compute_ambient_diff_and_drift(self.ambient_drift,
+                                                                                        self.ambient_diffusion,
+                                                                                        x_bnd, cov_bnd, mu_bnd)
+            return losses_subset, drift_loss, diffusion_loss, ambient_drift_loss, ambient_diff_loss
+
+    def compute_and_plot_errors(self, eps_grid_size, num_test, test_seed, device, local_space=False):
+        test_dict = self.generate_test_data(self.eps_max, num_test, test_seed, device)
+        x_test_full = test_dict["x"]
+        mu_test_full = test_dict["mu"]
+        cov_test_full = test_dict["cov"]
+        p_test_full = test_dict["p"]
+        h_test_full = test_dict["orthonormal_frame"]
+        local_x_test_full = test_dict["local_x"]
+
+        epsilons = np.linspace(0.05, self.eps_max, eps_grid_size)
+
+        loss_keys = [
+            "reconstruction loss", "encoder contractive loss", "decoder contractive loss",
+            "tangent bundle loss", "tangent angle loss", "tangent drift alignment loss",
+            "diffeomorphism loss"
+        ]
+
+        model_loss_storage = {name: {lk: [] for lk in loss_keys} for name in self.ae_list.keys()}
+        model_drift_losses = {name: [] for name in self.ae_list.keys()}
+        model_diffusion_losses = {name: [] for name in self.ae_list.keys()}
+        ambient_drift_losses = []
+        ambient_diffusion_losses = []
+
+        # Not sure why this isnt working
+        # interior_mask = self.is_interior_local(local_x_test_full, self.toydata.surface.bounds())
+        # for name, model in self.ae_list.items():
+        #     x_test = x_test_full[interior_mask]
+        #     mu_test = mu_test_full[interior_mask]
+        #     cov_test = cov_test_full[interior_mask]
+        #     p_test = p_test_full[interior_mask]
+        #     h_test = h_test_full[interior_mask]
+        #     losses = self.subset_error(interior_mask, model, x_test, mu_test, cov_test, p_test, h_test)
+        #     print(losses)
+
+        for eps in epsilons:
+            current_bounds = [(b[0] - eps, b[1] + eps) for b in self.toydata.surface.bounds()]
+            current_mask = self.is_interior_local(local_x_test_full, current_bounds)
+
+            x_test = x_test_full[current_mask]
+            mu_test = mu_test_full[current_mask]
+            cov_test = cov_test_full[current_mask]
+            p_test = p_test_full[current_mask]
+            h_test = h_test_full[current_mask]
+            local_x_test = local_x_test_full[current_mask]
+            interior_mask = self.is_interior_local(local_x_test, self.toydata.surface.bounds())
+            boundary_mask = ~interior_mask
+            # TODO: compute interior loss just once. maybe outside this loop? just masking
+            for name, model in self.ae_list.items():
+                losses = self.subset_error(boundary_mask, model, x_test, mu_test, cov_test, p_test, h_test)
+                if losses is not None:
+                    losses_subset, drift_loss, diffusion_loss, ambient_drift_loss, ambient_diff_loss = losses
+
+                    for key in loss_keys:
+                        model_loss_storage[name][key].append(losses_subset.get(key, np.nan))
+
+                    model_drift_losses[name].append(drift_loss)
+                    model_diffusion_losses[name].append(diffusion_loss)
+
+                    if name == list(self.ae_list.keys())[0]:
+                        ambient_drift_losses.append(ambient_drift_loss)
+                        ambient_diffusion_losses.append(ambient_diff_loss)
+                else:
+                    for key in loss_keys:
+                        model_loss_storage[name][key].append(np.nan)
+                    model_drift_losses[name].append(np.nan)
+                    model_diffusion_losses[name].append(np.nan)
+                    if name == list(self.ae_list.keys())[0]:
+                        ambient_drift_losses.append(np.nan)
+                        ambient_diffusion_losses.append(np.nan)
+
+        # Regular loss plots
+        for key in loss_keys:
+            fig = plt.figure()
+            for name in self.ae_list.keys():
+                plt.plot(epsilons, model_loss_storage[name][key], label=name)
+            plt.xlabel('Epsilon')
+            plt.ylabel(key)
+            plt.title(f'{key} vs Epsilon')
+            plt.legend()
+            plt.show()
+            save_plot(fig, self.trainer.exp_dir, plot_name=key+"_bd_errors")
+
+        # Drift Loss Plot
+        fig = plt.figure()
+        for name in self.ae_list.keys():
+            plt.plot(epsilons, model_drift_losses[name], label=f"{name} drift loss")
+        plt.plot(epsilons, ambient_drift_losses, linestyle="--", label="Ambient drift loss", color="black")
+        plt.xlabel("Epsilon")
+        plt.ylabel("Drift Loss")
+        plt.title("Drift Loss vs Epsilon")
+        plt.legend()
+        plt.show()
+        save_plot(fig, self.trainer.exp_dir, plot_name="drift_errors")
+
+        # Diffusion Loss Plot
+        fig = plt.figure()
+        for name in self.ae_list.keys():
+            plt.plot(epsilons, model_diffusion_losses[name], label=f"{name} diffusion loss")
+        plt.plot(epsilons, ambient_diffusion_losses, linestyle="--", label="Ambient diffusion loss", color="black")
+        plt.xlabel("Epsilon")
+        plt.ylabel("Diffusion Loss")
+        plt.title("Diffusion Loss vs Epsilon")
+        plt.legend()
+        plt.show()
+        save_plot(fig, self.trainer.exp_dir, plot_name="diffusion_bd_errors")
+        plt.close(fig)

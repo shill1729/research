@@ -4,7 +4,7 @@ import torch
 from torch import nn, Tensor
 from torch.utils.data import DataLoader, TensorDataset
 
-from ae.models.losses import TotalLoss, LocalDiffusionLoss, LocalDriftLoss
+from ae.models.losses import TotalLoss, LocalDiffusionLoss, LocalDriftLoss, LossWeights
 from ae.utils import set_grad_tracking
 
 
@@ -87,7 +87,7 @@ class ThreeStageFit:
         self.batch_size = batch_size
         self.print_freq = print_freq
 
-    def three_stage_fit(self, ae_diffusion, weights, x, mu, cov, p, orthonormal_frame, anneal_weights=None, norm="fro", device="cpu"):
+    def three_stage_fit(self, ae_diffusion, weights: LossWeights, x, mu, cov, p, orthonormal_frame, anneal_weights=None, norm="fro", device="cpu"):
         ae_loss = TotalLoss(weights, norm, device)
         diffusion_loss = LocalDiffusionLoss(norm)
         drift_loss = LocalDriftLoss()
