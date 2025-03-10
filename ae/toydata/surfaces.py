@@ -53,12 +53,19 @@ class SurfaceBase(ABC):
         """
         pass
 
-    @abstractmethod
-    def name(self):
-        pass
 
+# Surfaces of the form (x(u,v), y(u,v), z(u,v))
+class Sphere(SurfaceBase):
+    def equation(self):
+        return sp.Matrix([
+            sp.sin(self.u) * sp.cos(self.v),
+            sp.sin(self.u) * sp.sin(self.v),
+            sp.cos(self.u)
+        ])
 
-# Specific Surface Implementations
+    def bounds(self):
+        return [(0, np.pi), (0, 2 * np.pi)]
+
 
 class Cylinder(SurfaceBase):
     def equation(self):
@@ -66,29 +73,6 @@ class Cylinder(SurfaceBase):
 
     def bounds(self):
         return [(0, 2 * np.pi), (-2, 2)]
-
-    def name(self):
-        return "cylinder"
-
-
-class WaveSurface(SurfaceBase):
-    def __init__(self, amplitude=1.0, frequency_u=1.0, frequency_v=0.0, phase=0.0):
-        super().__init__()
-        self.amplitude = amplitude
-        self.frequency_u = frequency_u
-        self.frequency_v = frequency_v
-        self.phase = phase
-
-    def equation(self):
-        # Create a 2D wave pattern
-        z = self.amplitude * sp.sin(self.frequency_u * self.u + self.frequency_v * self.v + self.phase)
-        return sp.Matrix([self.u, self.v, z])
-
-    def bounds(self):
-        return [(-2*np.pi, 2*np.pi), (-2*np.pi, 2*np.pi)]
-
-    def name(self):
-        return "wave"
 
 
 class Torus(SurfaceBase):
@@ -107,8 +91,23 @@ class Torus(SurfaceBase):
     def bounds(self):
         return [(0, 2 * np.pi), (0, 2 * np.pi)]
 
-    def name(self):
-        return "torus"
+
+# Surfaces of the form $(x,y, f(x,y))$
+class WaveSurface(SurfaceBase):
+    def __init__(self, amplitude=1.0, frequency_u=1.0, frequency_v=0.0, phase=0.0):
+        super().__init__()
+        self.amplitude = amplitude
+        self.frequency_u = frequency_u
+        self.frequency_v = frequency_v
+        self.phase = phase
+
+    def equation(self):
+        # Create a 2D wave pattern
+        z = self.amplitude * sp.sin(self.frequency_u * self.u + self.frequency_v * self.v + self.phase)
+        return sp.Matrix([self.u, self.v, z])
+
+    def bounds(self):
+        return [(-2 * np.pi, 2 * np.pi), (-2 * np.pi, 2 * np.pi)]
 
 
 class Paraboloid(SurfaceBase):
@@ -124,9 +123,6 @@ class Paraboloid(SurfaceBase):
     def bounds(self):
         return [(-1, 1), (-1, 1)]
 
-    def name(self):
-        return "paraboloid"
-
 
 class ProductSurface(SurfaceBase):
     def __init__(self, a=4):
@@ -140,9 +136,6 @@ class ProductSurface(SurfaceBase):
     def bounds(self):
         return [(-1, 1), (-1, 1)]
 
-    def name(self):
-        return "product_surface"
-
 
 class HyperbolicParaboloid(SurfaceBase):
     def __init__(self, a=4, b=4):
@@ -155,25 +148,20 @@ class HyperbolicParaboloid(SurfaceBase):
         return sp.Matrix([self.u, self.v, fuv])
 
     def bounds(self):
-        return [(-2, 2), (-2, 2)]
-
-    def name(self):
-        return "hyperbolic_paraboloid"
+        return [(-1, 1), (-1, 1)]
 
 
-class Sphere(SurfaceBase):
+class SpherePatch(SurfaceBase):
     def equation(self):
         return sp.Matrix([
-            sp.sin(self.u) * sp.cos(self.v),
-            sp.sin(self.u) * sp.sin(self.v),
-            sp.cos(self.u)
+            self.u,
+            self.v,
+            sp.sqrt(1 - self.u ** 2 - self.v ** 2)
         ])
 
     def bounds(self):
-        return [(0, np.pi), (0, 2 * np.pi)]
-
-    def name(self):
-        return "sphere"
+        # (0, 0, 1), (0, sqrt(0.8), sqrt(1-0.8))
+        return [(0, 0.5), (0, np.sqrt(0.5))]
 
 
 class QuarticMinusCubic(SurfaceBase):
@@ -189,9 +177,6 @@ class QuarticMinusCubic(SurfaceBase):
     def bounds(self):
         return [(-1, 1), (-1, 1)]
 
-    def name(self):
-        return "quartic_minus_cubic"
-
 
 class RationalSurface(SurfaceBase):
     def __init__(self, a=1, b=1):
@@ -205,9 +190,6 @@ class RationalSurface(SurfaceBase):
 
     def bounds(self):
         return [(-1, 1), (-1, 1)]
-
-    def name(self):
-        return "rational_surface"
 
 
 # Example of usage
@@ -226,4 +208,3 @@ if __name__ == "__main__":
         print(f"Local Coordinates: {surface.local_coords()}")
         print(f"Equation: {surface.equation()}")
         print(f"Bounds: {surface.bounds()}")
-        print(f"Name: {surface.name()}\n")

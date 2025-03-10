@@ -53,23 +53,14 @@ class DynamicsBase(ABC):
         """
         pass
 
-    @abstractmethod
-    def name(self):
-        "Name of the process"
-        pass
-
 
 # Specific Dynamics Implementations
-
 class BrownianMotion(DynamicsBase):
     def drift(self, manifold=None):
         return sp.Matrix([0, 0])
 
     def diffusion(self, manifold=None):
         return sp.Matrix([[1, 0], [0, 1]])
-
-    def name(self):
-        return "bm"
 
 
 class RiemannianBrownianMotion(DynamicsBase):
@@ -79,38 +70,37 @@ class RiemannianBrownianMotion(DynamicsBase):
     def diffusion(self, manifold: RiemannianManifold):
         return manifold.local_bm_diffusion()
 
-    def name(self):
-        return "rbm"
+
+class LangevinHarmonicOscillator(DynamicsBase):
+
+    def __init__(self, temperature=1.):
+        super().__init__()
+        self.temperature = temperature
+
+    def drift(self, manifold: RiemannianManifold):
+        harmonic_potential = sp.Matrix([
+            self.u - 0.25,
+            self.v - 0.25
+        ])
+        manifold_drift = manifold.local_bm_drift() * (1 / self.temperature)
+        return -0.5 * manifold.metric_tensor().inv() * harmonic_potential + manifold_drift
+
+    def diffusion(self, manifold: RiemannianManifold):
+        return manifold.local_bm_diffusion() * sp.sqrt(1 / self.temperature)
 
 
 class LangevinDoubleWell(DynamicsBase):
     def drift(self, manifold: RiemannianManifold):
         double_well_potential = sp.Matrix([
-            4 * self.u * (self.u ** 2 - 0.5),
-            2 * self.v
-        ])/4
-        return -0.5 * manifold.metric_tensor().inv() * double_well_potential + manifold.local_bm_drift()
+            self.u * (self.u ** 2 - 0.25),
+            self.v / 2
+        ])
+        manifold_drift = manifold.local_bm_drift()
+        potential = manifold.metric_tensor().inv() * double_well_potential
+        return -0.5 * potential + manifold_drift
 
     def diffusion(self, manifold: RiemannianManifold):
         return manifold.local_bm_diffusion()
-
-    def name(self):
-        return "langevin_doublewell"
-
-
-class LangevinHarmonicOscillator(DynamicsBase):
-    def drift(self, manifold: RiemannianManifold):
-        harmonic_potential = 2. * sp.Matrix([
-            self.u-0.5,
-            self.v-0.5
-        ])
-        return -0.5 * manifold.metric_tensor().inv() * harmonic_potential + manifold.local_bm_drift()
-
-    def diffusion(self, manifold: RiemannianManifold):
-        return manifold.local_bm_diffusion()/5
-
-    def name(self):
-        return "langevin_harmonic"
 
 
 class LangevinGaussianWell(DynamicsBase):
@@ -124,9 +114,6 @@ class LangevinGaussianWell(DynamicsBase):
     def diffusion(self, manifold: RiemannianManifold):
         return manifold.local_bm_diffusion()
 
-    def name(self):
-        return "langevin_gaussianbump"
-
 
 class LangevinMorsePotential(DynamicsBase):
     def drift(self, manifold: RiemannianManifold):
@@ -138,9 +125,6 @@ class LangevinMorsePotential(DynamicsBase):
 
     def diffusion(self, manifold: RiemannianManifold):
         return manifold.local_bm_diffusion()
-
-    def name(self):
-        return "langevin_morse"
 
 
 class LangevinGravitationalPotential(DynamicsBase):
@@ -154,9 +138,6 @@ class LangevinGravitationalPotential(DynamicsBase):
     def diffusion(self, manifold: RiemannianManifold):
         return manifold.local_bm_diffusion()
 
-    def name(self):
-        return "langevin_gravity"
-
 
 class LangevinChemicalReactionPotential(DynamicsBase):
     def drift(self, manifold: RiemannianManifold):
@@ -168,9 +149,6 @@ class LangevinChemicalReactionPotential(DynamicsBase):
 
     def diffusion(self, manifold: RiemannianManifold):
         return manifold.local_bm_diffusion()
-
-    def name(self):
-        return "langevin_chem"
 
 
 class ArbitraryMotion(DynamicsBase):
@@ -186,9 +164,6 @@ class ArbitraryMotion(DynamicsBase):
             [0.02 * self.u * self.v, 0.1 + 0.1 * self.v]
         ]) / 5
 
-    def name(self):
-        return "arbitrary1"
-
 
 class ArbitraryMotion2(DynamicsBase):
     def drift(self, manifold=None):
@@ -203,53 +178,50 @@ class ArbitraryMotion2(DynamicsBase):
             [0.02 * self.u * self.v, 0.1 + 0.1 * self.v]
         ]) / 10
 
-    def name(self):
-        return "arbitrary2"
 
+class AnisotropicSDE(DynamicsBase):
+    def drift(self, manifold: RiemannianManifold):
+        u, v = self.u, self.v
 
-class AnisotropicDynamics(DynamicsBase):
-    def __init__(self):
-        super().__init__()
-
-    def drift(self, manifold=None):
-        """
-        Define the drift vector for the dynamics.
-
-        Parameters:
-        -----------
-        manifold : RiemannianManifold, optional
-            The manifold on which the dynamics are defined. Ignored in this implementation.
-
-        Returns:
-        --------
-        sympy.Matrix
-            Drift vector [-u(1 - u^2 - v^2), -v(1 - u^2 - v^2)].
-        """
-        drift = sp.Matrix([
-            -self.u * (1 - self.u ** 2 - self.v ** 2),
-            -self.v * (1 - self.u ** 2 - self.v ** 2)
+        # Define anisotropic drift a = (a^1, a^2)
+        a = sp.Matrix([
+            -2 * u + v,  # Example: Swirling motion or gradient flow
+            -2 * v
         ])
-        return drift/100
 
-    def diffusion(self, manifold=None):
-        """
-        Define the diffusion matrix for the dynamics.
+        return -0.5 * manifold.metric_tensor().inv() * a + manifold.local_bm_drift()
 
-        Parameters:
-        -----------
-        manifold : RiemannianManifold, optional
-            The manifold on which the dynamics are defined. Ignored in this implementation.
+    def diffusion(self, manifold: RiemannianManifold):
+        u, v = self.u, self.v
 
-        Returns:
-        --------
-        sympy.Matrix
-            Diffusion matrix [[1 + u, v], [u, 1 + v]].
-        """
-        diffusion = sp.Matrix([
-            [1 + self.u, self.v],
-            [self.u, 1 + self.v]
+        # Define anisotropic diffusion coefficient b (not necessarily isotropic)
+        b = sp.Matrix([
+            [1, 0],  # Stronger diffusion along u
+            [0, sp.exp(u)]  # Exponential growth in v-direction
         ])
-        return diffusion/100
 
-    def name(self):
-        return "anisotropic"
+        return manifold.local_bm_diffusion() * b
+
+
+class AnisotropicSDE2(DynamicsBase):
+    def drift(self, manifold: RiemannianManifold):
+        u, v = self.u, self.v
+
+        # Define anisotropic drift a = (a^1, a^2)
+        a = sp.Matrix([
+            -2 * u + v,  # Example: Swirling motion or gradient flow
+            -2 * v
+        ])
+
+        return a / 5
+
+    def diffusion(self, manifold: RiemannianManifold):
+        u, v = self.u, self.v
+
+        # Define anisotropic diffusion coefficient b (not necessarily isotropic)
+        b = sp.Matrix([
+            [1, 0],  # Stronger diffusion along u
+            [0, sp.exp(u)]  # Exponential growth in v-direction
+        ])
+
+        return b / 10

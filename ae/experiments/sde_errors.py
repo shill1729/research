@@ -8,11 +8,11 @@ import numpy as np
 
 
 class DynamicsError:
-    def __init__(self, toydata: ToyData, trainer: Trainer, tn: float):
+    def __init__(self, toydata: ToyData, trainer: Trainer, tn: float, show=False):
         self.toydata = toydata
         self.trainer = trainer
         self.sample_path_generator = SamplePathGenerator(self.toydata, self.trainer)
-        self.sample_path_plotter = SamplePathPlotter(self.toydata, self.trainer, tn)
+        self.sample_path_plotter = SamplePathPlotter(self.toydata, self.trainer, tn, show=show)
 
     @staticmethod
     def get_optimal_ntime(tn):

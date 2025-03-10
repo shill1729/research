@@ -11,13 +11,14 @@ import matplotlib.pyplot as plt
 
 
 class SamplePathPlotter:
-    def __init__(self, toydata: ToyData, trainer: Trainer, tn: float):
+    def __init__(self, toydata: ToyData, trainer: Trainer, tn: float, show=False):
         self.toydata = toydata
         self.trainer = trainer
         self.sample_path_generator = SamplePathGenerator(toydata, trainer)
         self.tn = tn
         self.time_horizon = get_time_horizon_name(tn)
         self.save_folder = self.trainer.exp_dir + self.time_horizon
+        self.show = show
 
     def _save_plot(self, fig, fk_stats_folder, name):
         os.makedirs(fk_stats_folder, exist_ok=True)
@@ -51,9 +52,8 @@ class SamplePathPlotter:
         """Finalizes plot with legend and optional saving."""
         handles = [plt.Line2D([0], [0], color=color, lw=2, label=label) for label, color in colors.items()]
         ax.legend(handles=handles)
-        plt.show()
-        # TODO: save plot otherway
-
+        if self.show:
+            plt.show()
         self._save_plot(fig, self.save_folder, name="sample_path_"+plot_name)
         plt.close(fig)
 
@@ -76,6 +76,7 @@ class SamplePathPlotter:
 
     def plot_kernel_density(self, gt_ensemble, model_ensembles, ambient_ensemble=None, terminal=True):
         """Generalized KDE plot for terminal or initial distributions."""
+        kl_dict = compute_kl_divergences(gt_ensemble, model_ensembles, ambient_ensemble, terminal, self.save_folder)
         npaths, ntime_plus_1, d = gt_ensemble.shape
         time_type = "terminal" if terminal else "1st-step"
         terminal_idx = -1 if terminal else 1
@@ -98,11 +99,13 @@ class SamplePathPlotter:
             ax.grid(True)
 
         plt.tight_layout()
-        plt.show()
+        if self.show:
+            plt.show()
         # Only save ambient coordinate densities, since we know locals aren't going to match.
         if ambient_ensemble is not None:
             save_plot(fig, self.save_folder, plot_name="kde_" + time_type)
         plt.close(fig)
+        return kl_dict
 
     def plot_time_series_with_errors(self, results):
         """
@@ -141,7 +144,8 @@ class SamplePathPlotter:
             ax2.grid(True)
 
             plt.tight_layout()
-            plt.show()
+            if self.show:
+                plt.show()
             self._save_plot(fig, self.save_folder, "fk_"+fname)
             plt.close(fig)
 
@@ -173,7 +177,8 @@ class SamplePathPlotter:
             ax.grid(True)
 
             plt.tight_layout()
-            plt.show()
+            if self.show:
+                plt.show()
 
             # Save the plot if directory is provided
             self._save_plot(fig, self.save_folder, "fk_conf" + fname)
@@ -218,7 +223,8 @@ class SamplePathPlotter:
         ax.set_title(error_type + " $\\|E(X_t)-E(\hat{X}_t)\\|_2$")
         ax.legend()
         ax.grid(True)
-        plt.show()
+        if self.show:
+            plt.show()
         # Save the plot if directory is provided
         self._save_plot(fig, self.save_folder, "deviation_of_means_"+plot_name)
         plt.close(fig)
@@ -257,7 +263,8 @@ class SamplePathPlotter:
         ax.set_title("$E(\\|X_t-\hat{X}_t\\|_2)$")
         ax.legend()
         ax.grid(True)
-        plt.show()
+        if self.show:
+            plt.show()
 
         # Save the plot if directory is provide
         self._save_plot(fig, self.save_folder, name="mean_deviation_"+plot_name)
@@ -297,7 +304,8 @@ class SamplePathPlotter:
         ax.set_title("$Var(\\|X_t-\\hat{X}_t\\|_2)$")
         ax.legend()
         ax.grid(True)
-        plt.show()
+        if self.show:
+            plt.show()
 
         # Save the plot if directory is provided
         self._save_plot(fig, self.save_folder, name="variance_deviation_"+plot_name)
@@ -353,7 +361,8 @@ class SamplePathPlotter:
         ax.set_title(f"{error_type} $\\|Cov(X_t)-Cov(\\hat{{X}}_t)\\|_{{{norm_name}}}$")
         ax.legend()
         ax.grid(True)
-        plt.show()
+        if self.show:
+            plt.show()
 
         # Save the plot if directory is providee
         self._save_plot(fig, self.save_folder, name=norm_name+"_covariance_error_"+plot_name)

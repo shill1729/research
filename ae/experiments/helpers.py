@@ -31,6 +31,21 @@ def save_plot(fig, exp_dir, plot_name):
     print(f"Saved plot: {plot_path}")
 
 
+def save_table(latex_content, exp_dir, table_name):
+    """Save LaTeX table in the experiment directory."""
+    table_path = os.path.join(exp_dir, f"{table_name}.tex")
+    with open(table_path, "w") as f:
+        f.write(latex_content)
+    print(f"Saved LaTeX table: {table_path}")
+
+
+def print_dict(my_dict: dict):
+    for key, values in my_dict.items():
+        print(key)
+        print(values)
+        # print("\n")
+
+
 def get_experiment_name(params):
     """Generate a unique name for an experiment based on key hyperparameters."""
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")

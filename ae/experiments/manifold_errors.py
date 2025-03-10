@@ -10,9 +10,10 @@ from ae.utils.performance_analysis import compute_test_losses
 from ae.experiments.helpers import save_plot
 from ae.experiments.training import Trainer
 
+
 class GeometryError:
     def __init__(self, toydata: ToyData, trainer: Trainer,
-                 eps_max=1., device="cpu"):
+                 eps_max=1., device="cpu", show=False):
         self.toydata = toydata
         self.ae_dict = trainer.models
         self.ambient_drift_loss = AmbientDriftLoss()
@@ -23,6 +24,7 @@ class GeometryError:
         self.ambient_drift = trainer.ambient_drift
         self.ambient_diffusion = trainer.ambient_diffusion
         self.trainer = trainer
+        self.show = show
 
     def generate_test_data(self, epsilon=1., n=1000, test_seed=None, device="cpu"):
         self.toydata.set_point_cloud(epsilon, True)
@@ -154,7 +156,8 @@ class GeometryError:
             plt.ylabel(key)
             plt.title(f'{key} vs Epsilon')
             plt.legend()
-            plt.show()
+            if self.show:
+                plt.show()
             save_plot(fig, self.trainer.exp_dir, plot_name=key+"_bd_errors")
 
         # Drift Loss Plot
@@ -166,7 +169,8 @@ class GeometryError:
         plt.ylabel("Drift Loss")
         plt.title("Drift Loss vs Epsilon")
         plt.legend()
-        plt.show()
+        if self.show:
+            plt.show()
         save_plot(fig, self.trainer.exp_dir, plot_name="drift_errors")
 
         # Diffusion Loss Plot
@@ -178,6 +182,7 @@ class GeometryError:
         plt.ylabel("Diffusion Loss")
         plt.title("Diffusion Loss vs Epsilon")
         plt.legend()
-        plt.show()
+        if self.show:
+            plt.show()
         save_plot(fig, self.trainer.exp_dir, plot_name="diffusion_bd_errors")
         plt.close(fig)
