@@ -81,10 +81,12 @@ class Trainer:
                                                            data["orthonormal_frame"],
                                                            anneal_weights_to_use, self.params["norm"], self.device)
         print("Training ambient networks...")
-        fit_model(self.ambient_drift, AmbientDriftLoss(), data["x"], data["mu"], self.params["lr"],
+        x = data["x"]
+        # z = self.models["vanilla"].autoencoder.encoder(x).detach()
+        fit_model(self.ambient_drift, AmbientDriftLoss(), x, data["mu"], self.params["lr"],
                   self.params["epochs_drift"],
                   self.params["print_freq"], self.params["weight_decay"], self.params["batch_size"])
-        fit_model(self.ambient_diffusion, AmbientDiffusionLoss(), data["x"], data["cov"], self.params["lr"],
+        fit_model(self.ambient_diffusion, AmbientDiffusionLoss(), x, data["cov"], self.params["lr"],
                   self.params["epochs_drift"],
                   self.params["print_freq"], self.params["weight_decay"], self.params["batch_size"])
 

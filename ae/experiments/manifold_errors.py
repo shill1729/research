@@ -35,7 +35,12 @@ class GeometryError:
                                        diffusion_model: AmbientDiffusionNetwork,
                                        x_subset, cov_subset, mu_subset):
         # Comment this and use it if you want to use local.
-        # z_subset = aedf.autoencoder.encoder(x_subset)
+        # z_subset = self.trainer.models["vanilla"].autoencoder.encoder(x_subset)
+        # 3/11/2025: it doesnt make sense to train mu(z) and sigma(z) ambiently.
+        # The vanilla AE has its own mu(z) and sigma(z) network that gets trained locally in R^d and
+        # mapped up to ambient dimension.
+        # The vanilla ambient model must have mu(x) and sigma(x) in R^D (R^{D x D}) for sample paths
+        # unless you do some encoding and decoding which I guess we could test too.
         mu_loss = self.ambient_drift_loss.forward(drift_model, x_subset, mu_subset).item()
         sigma_loss = self.ambient_diffusion_loss.forward(diffusion_model, x_subset, cov_subset).item()
         return mu_loss, sigma_loss

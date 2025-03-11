@@ -19,25 +19,24 @@ eps_max = 1.
 eps_grid_size = 10
 # The intrinsic and extrinsic dimensions.
 extrinsic_dim, intrinsic_dim = 3, 2
-hidden_dims = [16]
-diffusion_layers = [8]
-drift_layers = [8]
+hidden_dims = [32]
+diffusion_layers = [16]
+drift_layers = [16]
 lr = 0.001
 weight_decay = 0.
-# TODO: i would like to see which files were trained with different epochs. right now the file name doesnt report that
-epochs_ae = 9000
+epochs_ae = 1
 epochs_diffusion = epochs_ae
 epochs_drift = epochs_ae
 print_freq = 500
 # Diffeo weight for accumulative orders
-diffeo_weight_12 = 0.01  # this is the separate diffeo_weight for just the First order and second order
+diffeo_weight_12 = 0.02  # this is the separate diffeo_weight for just the First order and second order
 # First order weight: 0.08 was good
-tangent_angle_weight = 0.01
+tangent_angle_weight = 0.02
 # Second order weights accumulative
-tangent_angle_weight2 = 0.01  # the first order weight for the second order model, if accumulating penalties
-tangent_drift_weight = 0.001
+tangent_angle_weight2 = 0.02  # the first order weight for the second order model, if accumulating penalties
+tangent_drift_weight = 0.002
 surface = Paraboloid()
-dynamics = LangevinHarmonicOscillator(50.)
+dynamics = RiemannianBrownianMotion()
 
 # Main below
 params = {

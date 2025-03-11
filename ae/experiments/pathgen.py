@@ -38,10 +38,7 @@ class SamplePathGenerator:
         :return: tuple (ambient_paths, latent_paths), of shape (npaths, ntime+1, D) and (npaths, ntime+1, d)
         """
         latent_paths = model.latent_sde.sample_paths(z0, tn, ntime, npaths)
-        ambient_paths = np.zeros((npaths, ntime + 1, 3))
-        for j in range(npaths):
-            ambient_paths[j, :, :] = model.autoencoder.decoder(
-                torch.tensor(latent_paths[j, :, :], dtype=torch.float32)).detach().numpy()
+        ambient_paths = model.lift_sample_paths(latent_paths)
         return ambient_paths, latent_paths
 
     @staticmethod
@@ -63,9 +60,6 @@ class SamplePathGenerator:
         print("l2 Recon Error for x0 = " + str(np.linalg.vector_norm(x0_hat - x0_numpy, ord=2)))
         return z0_numpy
 
-    import numpy as np
-    import torch
-
     def get_best_point(self, num_samples=1000, seed=None):
         """
         Generate random points and find the single point that minimizes
@@ -77,6 +71,8 @@ class SamplePathGenerator:
         :param seed: Random seed for reproducibility
         :return: The best point x0 (numpy array) minimizing max recon error across models
         """
+        # Make sure we are generating in the original interior
+        self.toydata.set_point_cloud()
         x0_samples = self.toydata.point_cloud.generate(num_samples, seed=seed)[0]  # numpy (num_samples, D)
 
         best_x0 = None
@@ -122,12 +118,10 @@ class SamplePathGenerator:
         # TODO: right now the initial point 'x0' is generated internally. Do we want the option to pass it?
         # x0 = self.toydata.point_cloud.generate(1, seed=seed)[0]  # numpy (D,)
         x0 = self.get_best_point()
-        # TODO: use get_Z0 and find the smallest reconstruction error point and start from there.
-
-        ambient_gt, local_gt = self.toydata.ground_truth_ensemble(x0, tn, ntime, npaths)
-        vanilla_ambient_paths = self.ambient_sde.sample_ensemble(x0, tn, ntime, npaths, noise_dim=3)
         x0_torch = torch.tensor(x0, dtype=torch.float32).unsqueeze(0)  # torch (1,D)
         z0_dict = {name: self.__get_z0(model, x0_torch, name) for name, model in self.trainer.models.items()}
+        ambient_gt, local_gt = self.toydata.ground_truth_ensemble(x0, tn, ntime, npaths)
+        vanilla_ambient_paths = self.ambient_sde.sample_ensemble(x0, tn, ntime, npaths, noise_dim=3)
         ae_paths = {name: self.__generate_paths_ae(z0_dict[name], model, tn, npaths, ntime) for name, model in self.trainer.models.items()}
         ambient_ae_paths = {name: ae_paths[name][0] for name in self.trainer.models.keys()}
         local_ae_paths = {name: ae_paths[name][1] for name in self.trainer.models.keys()}

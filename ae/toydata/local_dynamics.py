@@ -71,22 +71,27 @@ class RiemannianBrownianMotion(DynamicsBase):
         return manifold.local_bm_diffusion()
 
 
+# TODO: We should refactor this internally, but keep the same names for the folder directory structure.
 class LangevinHarmonicOscillator(DynamicsBase):
 
-    def __init__(self, temperature=1.):
+    def __init__(self, temperature=0.5):
         super().__init__()
         self.temperature = temperature
+        self.inverse_temp = 1 / temperature
 
     def drift(self, manifold: RiemannianManifold):
         harmonic_potential = sp.Matrix([
-            self.u - 0.25,
-            self.v - 0.25
+            self.u-0.5,
+            self.v-0.5
         ])
-        manifold_drift = manifold.local_bm_drift() * (1 / self.temperature)
-        return -0.5 * manifold.metric_tensor().inv() * harmonic_potential + manifold_drift
+        manifold_drift = manifold.local_bm_drift()
+        manifold_potential = manifold.metric_tensor().inv() * harmonic_potential * self.inverse_temp
+        drift_term = -0.5 * manifold_potential + manifold_drift
+        return drift_term
 
     def diffusion(self, manifold: RiemannianManifold):
-        return manifold.local_bm_diffusion() * sp.sqrt(1 / self.temperature)
+        manifold_diffusion = manifold.local_bm_diffusion()
+        return manifold_diffusion
 
 
 class LangevinDoubleWell(DynamicsBase):
@@ -213,7 +218,7 @@ class AnisotropicSDE2(DynamicsBase):
             -2 * v
         ])
 
-        return a / 5
+        return a / 10.
 
     def diffusion(self, manifold: RiemannianManifold):
         u, v = self.u, self.v
@@ -224,4 +229,5 @@ class AnisotropicSDE2(DynamicsBase):
             [0, sp.exp(u)]  # Exponential growth in v-direction
         ])
 
-        return b / 10
+        return b / 10.
+

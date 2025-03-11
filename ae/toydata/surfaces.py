@@ -121,7 +121,7 @@ class Paraboloid(SurfaceBase):
         return sp.Matrix([self.u, self.v, fuv])
 
     def bounds(self):
-        return [(-1, 1), (-1, 1)]
+        return [(-2., 2.), (-2., 2.)]
 
 
 class ProductSurface(SurfaceBase):
@@ -134,7 +134,7 @@ class ProductSurface(SurfaceBase):
         return sp.Matrix([self.u, self.v, fuv])
 
     def bounds(self):
-        return [(-1, 1), (-1, 1)]
+        return [(-2., 2.), (-2., 2.)]
 
 
 class HyperbolicParaboloid(SurfaceBase):
@@ -148,7 +148,7 @@ class HyperbolicParaboloid(SurfaceBase):
         return sp.Matrix([self.u, self.v, fuv])
 
     def bounds(self):
-        return [(-1, 1), (-1, 1)]
+        return [(-2., 2.), (-2., 2.)]
 
 
 class SpherePatch(SurfaceBase):
@@ -175,7 +175,7 @@ class QuarticMinusCubic(SurfaceBase):
         return sp.Matrix([self.u, self.v, fuv])
 
     def bounds(self):
-        return [(-1, 1), (-1, 1)]
+        return [(-2., 2.), (-2., 2.)]
 
 
 class RationalSurface(SurfaceBase):
@@ -189,7 +189,7 @@ class RationalSurface(SurfaceBase):
         return sp.Matrix([self.u, self.v, fuv])
 
     def bounds(self):
-        return [(-1, 1), (-1, 1)]
+        return [(-2., 2.), (-2., 2.)]
 
 
 # Example of usage

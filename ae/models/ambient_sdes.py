@@ -51,5 +51,5 @@ class AmbientDiffusionNetwork(nn.Module):
 
     def diffusion_numpy(self, t, z):
         w = torch.tensor(z, dtype=torch.float32)
-        d = z.shape[0]
+        d = self.output_dim
         return self.diffusion.forward(w).view((d, d)).detach().numpy()

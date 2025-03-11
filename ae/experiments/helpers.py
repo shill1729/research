@@ -33,6 +33,7 @@ def save_plot(fig, exp_dir, plot_name):
 
 def save_table(latex_content, exp_dir, table_name):
     """Save LaTeX table in the experiment directory."""
+    os.makedirs(exp_dir, exist_ok=True)
     table_path = os.path.join(exp_dir, f"{table_name}.tex")
     with open(table_path, "w") as f:
         f.write(latex_content)
