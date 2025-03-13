@@ -6,23 +6,23 @@ from ae.experiments.helpers import get_time_horizon_name, print_dict
 import numpy as np
 
 # Settings that remain constant
-show_geo = True
+show_geo = False
 show_stats = True
 eps_grid_size = 10
 num_test = 20000
 h = 0.001
-n_paths = 2000
+n_paths = 800
 device = "cpu"
 # Define a list of time horizons to test
-time_horizons = [0.05, 0.5, 1.]
+time_horizons = [0.5]
 
 # Load the pre-trained model: note working directory is currently ae/experiments
-model_dir = "trained_models/Paraboloid/RiemannianBrownianMotion/trained_20250311-001907_h[32]_df[16]_dr[16]_lr0.001_epochs1_not_annealed"
+model_dir = "trained_models/WaveSurface/ArbitraryMotion/trained_20250311-154328_h[32, 32]_df[8]_dr[8]_lr0.001_epochs9000_annealed_2nd"
 trainer = Trainer.load_from_pretrained(model_dir)
 
 # Run geometry error once
-geometry = GeometryError(trainer.toy_data, trainer, 1., device, show=show_geo)
-geometry.compute_and_plot_errors(eps_grid_size, num_test, None, device)
+# geometry = GeometryError(trainer.toy_data, trainer, 1., device, show=show_geo)
+# geometry.compute_and_plot_errors(eps_grid_size, num_test, None, device)
 
 
 # Loop over each time horizon and run dynamics error analysis

@@ -241,17 +241,17 @@ def compute_K_hessian_fast(lmbd, xs, A_inv_array):
       Hessian: a (k, k) NumPy array.
     """
     # Compute A_lambda_inv and S as in compute_K.
-    A_lambda_inv = (lmbd[:, None, None] * A_inv_array).sum(axis=0)
+    B_inv = (lmbd[:, None, None] * A_inv_array).sum(axis=0)
     Ax = np.matmul(A_inv_array, xs[..., None]).squeeze(-1)
     S = (lmbd[:, None] * Ax).sum(axis=0)
 
     try:
-        m_lambda = np.linalg.solve(A_lambda_inv, S)
+        m_lambda = np.linalg.solve(B_inv, S)
     except np.linalg.LinAlgError:
         return np.zeros((lmbd.shape[0], lmbd.shape[0]))
 
     # Compute B = inv(A_lambda_inv)
-    B = np.linalg.inv(A_lambda_inv)
+    B = np.linalg.inv(B_inv)
 
     # Compute the difference vectors
     diff = xs - m_lambda  # shape (k, d)
@@ -390,7 +390,7 @@ if __name__ == "__main__":
     runtime_wrapper(k=3, d=50)
     runtime_wrapper(k=3, d=100)
     runtime_wrapper(k=3, d=500)
-    # 4-tuples
+    # # 4-tuples
     runtime_wrapper(k=4, d=2)
     runtime_wrapper(k=4, d=3)
     runtime_wrapper(k=4, d=50)

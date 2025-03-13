@@ -159,15 +159,15 @@ class LangevinChemicalReactionPotential(DynamicsBase):
 class ArbitraryMotion(DynamicsBase):
     def drift(self, manifold=None):
         return sp.Matrix([
-            -5 * (self.u - 0.5),
-            5 * (self.u - 1)
-        ]) / 6
+            -(self.u - 0.5),
+             (self.u - 1)
+        ]) / 10
 
     def diffusion(self, manifold=None):
         return sp.Matrix([
             [0.1 * sp.sin(self.u) + self.v ** 2, 0.05 * sp.cos(self.v) + self.u],
             [0.02 * self.u * self.v, 0.1 + 0.1 * self.v]
-        ]) / 5
+        ]) / 10
 
 
 class ArbitraryMotion2(DynamicsBase):
@@ -175,13 +175,13 @@ class ArbitraryMotion2(DynamicsBase):
         return sp.Matrix([
             -self.v,
             self.u
-        ]) / 10
+        ]) / (1 + self.v ** 2 + self.u ** 2)
 
     def diffusion(self, manifold=None):
         return sp.Matrix([
             [0.1 * sp.sin(self.u) + self.v ** 2, 0.05 * sp.cos(self.v) + self.u],
             [0.02 * self.u * self.v, 0.1 + 0.1 * self.v]
-        ]) / 10
+        ]) / 5
 
 
 class AnisotropicSDE(DynamicsBase):

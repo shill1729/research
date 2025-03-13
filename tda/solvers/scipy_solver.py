@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.optimize import minimize
+from scipy.optimize import minimize, LinearConstraint
 from tda.solvers.kfunction import compute_K_gradient_fast, compute_K_fast, compute_K_hessian_fast, get_A_operations_fast
 from tda.solvers.kfunction import compute_K, compute_K_gradient
 
@@ -27,13 +27,29 @@ def minimize_K(eps, xs, A_array=None, solver="SLSQP"):
     def jac(lmbd, eps, xs, A_inv_array, x_Ainv_x):
         return compute_K_gradient_fast(lmbd, xs, A_inv_array)
 
+    def hess(lmbd, eps, xs, A_inv_array, x_Ainv_x):
+        return compute_K_hessian_fast(lmbd, xs, A_inv_array)
+
     lmbd0 = np.ones(k) / k  # initial uniform guess
     constraints = {'type': 'eq', 'fun': lambda lmbd: np.sum(lmbd) - 1}
-    bounds = [(0, 1) for _ in range(k)]
+    bounds = [(0., 1.) for _ in range(k)]
 
-    res = minimize(obj, lmbd0, args=(eps, xs, A_inv_array, x_Ainv_x), method=solver, jac=jac, bounds=bounds,
-                   constraints=constraints, tol=1e-6)
-
+    # Trust-constr needs different constraint format/type
+    A_constr = np.ones((1, k))  # Row vector of ones
+    lb = ub = np.array([1])  # Equality constraint
+    constraint_trust = LinearConstraint(A_constr, lb, ub)
+    if solver == "SLSQP":
+        res = minimize(obj, lmbd0, args=(eps, xs, A_inv_array, x_Ainv_x), method=solver, jac=jac, hess=None,
+                       bounds=bounds,
+                       constraints=constraints, tol=1e-9)
+    elif solver == "trust-constr":
+        res = minimize(obj, lmbd0, args=(eps, xs, A_inv_array, x_Ainv_x), method=solver, jac=jac, hess=hess,
+                       bounds=bounds,
+                       # Expected type complaint here because I have scipy 1.13.1,
+                       # 1.15.2 documentation would accept this but 1.13 doesn't yet.
+                       constraints=[constraint_trust], tol=1e-9)
+    else:
+        raise ValueError("Only ineq+eq constrained solvers are SLSQP and trust-constr")
     opt_lmbd = res.x
     # Recompute m(λ) at the optimum.
     A_lambda_inv = np.tensordot(opt_lmbd, A_inv_array, axes=([0], [0]))
@@ -60,6 +76,3 @@ def ellipsoidal_intersection(eps, xs, A_list):
     """
     result = minimize_K(eps, xs, A_list)
     return result["K_min"] > 0
-
-
-

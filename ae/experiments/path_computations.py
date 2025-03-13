@@ -8,6 +8,7 @@ from scipy.integrate import trapz
 
 from ae.experiments.helpers import save_table
 
+
 def apply_function(gt, amb, aes: dict, func):
     """
 

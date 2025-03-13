@@ -1,4 +1,3 @@
-# TODO: does this work?
 import torch
 import numpy as np
 import sys
@@ -22,6 +21,27 @@ def interactive_menu():
     return choice
 
 
+def select_surface():
+    surfaces = ["Paraboloid", "HyperbolicParaboloid", "ProductSurface", "RationalSurface", "QuarticMinusCubic"]
+    print("Available Surfaces:")
+    for i, s in enumerate(surfaces, 1):
+        print(f"{i}. {s}")
+    choice = int(input("Select a surface: ") or 1) - 1
+    return globals()[surfaces[choice]]()
+
+
+def select_dynamics():
+    dynamics_list = ["BrownianMotion", "RiemannianBrownianMotion", "LangevinHarmonicOscillator",
+                     "LangevinDoubleWell", "LangevinGaussianWell", "LangevinMorsePotential",
+                     "LangevinGravitationalPotential", "LangevinChemicalReactionPotential",
+                     "ArbitraryMotion", "ArbitraryMotion2", "AnisotropicSDE", "AnisotropicSDE2"]
+    print("Available Dynamics:")
+    for i, d in enumerate(dynamics_list, 1):
+        print(f"{i}. {d}")
+    choice = int(input("Select a dynamics model: ") or 1) - 1
+    return globals()[dynamics_list[choice]]()
+
+
 def configure_training():
     print("\n=== Model Training Configuration ===")
     num_points = int(input("Enter number of points (default: 30): ") or 30)
@@ -29,8 +49,8 @@ def configure_training():
     batch_size = int(input("Enter batch size (default: 20): ") or 20)
     lr = float(input("Enter learning rate (default: 0.001): ") or 0.001)
     epochs = int(input("Enter number of epochs (default: 9000): ") or 9000)
-    surface = Paraboloid()
-    dynamics = LangevinHarmonicOscillator()
+    surface = select_surface()
+    dynamics = select_dynamics()
     device = torch.device("cpu")
 
     params = {
