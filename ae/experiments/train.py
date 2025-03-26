@@ -5,6 +5,7 @@ from ae.experiments.training import Trainer
 from ae.toydata.local_dynamics import *
 from ae.toydata.surfaces import *
 
+
 device = torch.device("cpu")
 train_seed = None
 test_seed = None
@@ -19,14 +20,14 @@ eps_max = 1.
 eps_grid_size = 10
 # The intrinsic and extrinsic dimensions.
 extrinsic_dim, intrinsic_dim = 3, 2
-hidden_dims = [32, 32]
-diffusion_layers = [8]
-drift_layers = [8]
+hidden_dims = [32]
+diffusion_layers = [32]
+drift_layers = [32]
 lr = 0.001
 weight_decay = 0.
 epochs_ae = 9000
-epochs_diffusion = 5000
-epochs_drift = 5000
+epochs_diffusion = 9000
+epochs_drift = 9000
 print_freq = 500
 # Diffeo weight for accumulative orders
 diffeo_weight_12 = 0.1  # this is the separate diffeo_weight for just the First order and second order
@@ -35,7 +36,7 @@ tangent_angle_weight = 0.01
 # Second order weights accumulative
 tangent_angle_weight2 = 0.01  # the first order weight for the second order model, if accumulating penalties
 tangent_drift_weight = 0.01
-surface = WaveSurface()
+surface = Paraboloid()
 dynamics = RiemannianBrownianMotion()
 
 # Main below
@@ -68,9 +69,9 @@ params = {
 # np.round(epochs_ae / 5) else 0.}
 
 # Constant tangent drift weight after warm start
-anneal_weights = {"tangent_drift_weight": lambda epoch: tangent_drift_weight if epoch >
-np.round(epochs_ae / 5) else 0.}
-# anneal_weights = None
+# anneal_weights = {"tangent_drift_weight": lambda epoch: tangent_drift_weight if epoch >
+# np.round(epochs_ae / 5) else 0.}
+anneal_weights = None
 
 anneal_tag = "annealed_2nd" if anneal_weights is not None else "not_annealed"
 

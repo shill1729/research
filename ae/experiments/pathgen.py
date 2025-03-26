@@ -7,7 +7,7 @@ import numpy as np
 from ae.experiments.datagen import ToyData
 from ae.experiments.training import Trainer
 from ae.models.local_neural_sdes import AutoEncoderDiffusion
-from ae.sdes.sdes import SDE
+from sdes.sdes import SDE
 
 
 class SamplePathGenerator:
@@ -118,6 +118,11 @@ class SamplePathGenerator:
         # TODO: right now the initial point 'x0' is generated internally. Do we want the option to pass it?
         # x0 = self.toydata.point_cloud.generate(1, seed=seed)[0]  # numpy (D,)
         x0 = self.get_best_point()
+        print("Point with smallest reconstruction error")
+        print(x0)
+        # x0 = self.toydata.point_cloud.np_phi(*[0.8, 0.8]).squeeze(1)
+        # print("Point near the boundary")
+        # print(x0)
         x0_torch = torch.tensor(x0, dtype=torch.float32).unsqueeze(0)  # torch (1,D)
         z0_dict = {name: self.__get_z0(model, x0_torch, name) for name, model in self.trainer.models.items()}
         ambient_gt, local_gt = self.toydata.ground_truth_ensemble(x0, tn, ntime, npaths)

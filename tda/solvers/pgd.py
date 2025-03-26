@@ -1,8 +1,9 @@
 import numpy as np
+from scipy.linalg import cho_solve
 from tda.solvers.kfunction import compute_K_gradient_fast, compute_K_fast, compute_K_hessian_fast, get_A_operations_fast
 
 
-def project_to_simplex(v):
+def project_to_simplex_deprecated(v):
     """
     Project a vector v onto the probability simplex Δ_k.
 
@@ -14,6 +15,14 @@ def project_to_simplex(v):
     rho = np.where(v_sorted - (v_cumsum - 1) / (np.arange(len(v)) + 1) > 0)[0][-1]
     theta = (v_cumsum[rho] - 1) / (rho + 1)
     return np.maximum(v - theta, 0)
+
+def project_to_simplex(v):
+    u = v.copy()
+    u_sum = u.sum()
+    if u_sum <= 1.0 + 1e-6:  # Already on simplex
+        return np.clip(u, 0, None)
+    u -= (u_sum - 1.0) / len(u)
+    return np.maximum(u, 0)
 
 
 def projected_gradient_descent(eps, xs, A_list, step_size=0.001, max_iters=5000, tol=1e-10):
@@ -44,8 +53,14 @@ def projected_gradient_descent(eps, xs, A_list, step_size=0.001, max_iters=5000,
     A_lambda_inv = np.tensordot(lmbd, A_inv_array, axes=([0], [0]))
     # The centroid is given by a linear system B m = S
     S = np.sum(lmbd[:, None] * np.einsum('ijk,ik->ij', A_inv_array, xs), axis=0)
+    # try:
+    #     m_lambda = np.linalg.solve(A_lambda_inv, S)
+    # except np.linalg.LinAlgError:
+    #     m_lambda = None
+    A_lambda_inv = np.tensordot(lmbd, A_inv_array, axes=([0], [0]))
     try:
-        m_lambda = np.linalg.solve(A_lambda_inv, S)
+        L = np.linalg.cholesky(A_lambda_inv)
+        m_lambda = cho_solve((L, True), S)  # Backsubstitution
     except np.linalg.LinAlgError:
         m_lambda = None
 

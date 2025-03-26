@@ -1,6 +1,6 @@
 import sympy as sp
 from typing import Tuple, List
-from ae.sdes.sdes import SDE
+from sdes.sdes import SDE
 from ae.toydata.sampler import ImportanceSampler
 from ae.symbolic.diffgeo import RiemannianManifold
 from matplotlib.patches import Ellipse

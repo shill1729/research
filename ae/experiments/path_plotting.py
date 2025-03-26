@@ -333,7 +333,7 @@ class SamplePathPlotter:
         cov_gt, cov_ambient, cov_ae_models = compute_covariance_sample_paths(paths_ground_truth, paths_ambient, paths_ae)
 
         # Compute ground truth norm for relative errors
-        cov_gt_norm = np.linalg.matrix_norm(cov_gt, ord=norm if norm != -2 else None)
+        cov_gt_norm = np.linalg.matrix_norm(cov_gt, ord=norm)
 
         # Combine all covariance matrices
         model_covariances = {"Ground Truth": cov_gt, **cov_ae_models, "Ambient Model": cov_ambient}
@@ -341,12 +341,7 @@ class SamplePathPlotter:
         # Plot errors for each model
         for model_name, cov_path in model_covariances.items():
             if model_name != "Ground Truth":  # Skip ground truth
-                if norm == -2:
-                    # For spectral norm (-2)
-                    absolute_errors = np.array([np.linalg.norm(cov_gt[t] - cov_path[t], ord=None)
-                                                for t in range(len(cov_gt))])
-                else:
-                    absolute_errors = np.linalg.matrix_norm(cov_gt - cov_path, ord=norm)
+                absolute_errors = np.linalg.matrix_norm(cov_gt - cov_path, ord=norm)
 
                 if relative:
                     errors = absolute_errors / cov_gt_norm

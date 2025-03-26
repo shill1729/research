@@ -80,10 +80,17 @@ class LangevinHarmonicOscillator(DynamicsBase):
         self.inverse_temp = 1 / temperature
 
     def drift(self, manifold: RiemannianManifold):
-        harmonic_potential = sp.Matrix([
-            self.u-0.5,
-            self.v-0.5
-        ])
+        if manifold.local_coordinates.shape[0] == 2:
+            harmonic_potential = sp.Matrix([
+                self.u-0.5,
+                self.v-0.5
+            ])
+        elif manifold.local_coordinates.shape[0] == 1:
+            harmonic_potential = sp.Matrix([
+                self.u - 0.5
+            ])
+        else:
+            raise NotImplementedError("Only intrinsic dimensions 2 and 1 are implemented")
         manifold_drift = manifold.local_bm_drift()
         manifold_potential = manifold.metric_tensor().inv() * harmonic_potential * self.inverse_temp
         drift_term = -0.5 * manifold_potential + manifold_drift
@@ -160,7 +167,7 @@ class ArbitraryMotion(DynamicsBase):
     def drift(self, manifold=None):
         return sp.Matrix([
             -(self.u - 0.5),
-             (self.u - 1)
+             (self.u - 0.5)
         ]) / 10
 
     def diffusion(self, manifold=None):

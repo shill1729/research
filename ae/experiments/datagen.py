@@ -101,8 +101,10 @@ class ToyData:
         """
         # Assuming toy data of the form (x, y, f(x,y)):
         # TODO consider implementing phi^{-1} in diff_geo.py to avoid this limitation
-        z0_true = x0[:2]
-        ambient_paths = np.zeros((npaths, ntime + 1, 3))
+        d = self.manifold.local_coordinates.shape[0]
+        z0_true = x0[:d]
+        # TODO: currently only hypersurfaces are implemented
+        ambient_paths = np.zeros((npaths, ntime + 1, d+1))
         latent_paths = self.point_cloud.latent_sde.sample_ensemble(z0_true, tn, ntime, npaths)
         for j in range(npaths):
             for i in range(ntime + 1):

@@ -3,16 +3,15 @@ from dataclasses import dataclass
 import torch
 import torch.nn as nn
 from torch import Tensor
-from typing import Tuple
 
+from ae.models.ambient_sdes import AmbientDiffusionNetwork, AmbientDriftNetwork
 from ae.models.autoencoder import AutoEncoder
 from ae.models.local_neural_sdes import ambient_quadratic_variation_drift, AutoEncoderDiffusion
-from ae.models.ambient_sdes import AmbientDiffusionNetwork, AmbientDriftNetwork
 
 
 class AmbientDriftLoss(nn.Module):
     """
-        Compute the mean square error between two matrices under any matrix-norm.
+        Compute the mean square error between vectors
     """
 
     def __init__(self, *args, **kwargs):

@@ -10,14 +10,14 @@ show_geo = False
 show_stats = True
 eps_grid_size = 10
 num_test = 20000
-h = 0.001
-n_paths = 800
+h = 5/3
+n_paths = 500
 device = "cpu"
 # Define a list of time horizons to test
-time_horizons = [0.5]
+time_horizons = [5.]
 
 # Load the pre-trained model: note working directory is currently ae/experiments
-model_dir = "trained_models/WaveSurface/ArbitraryMotion/trained_20250311-154328_h[32, 32]_df[8]_dr[8]_lr0.001_epochs9000_annealed_2nd"
+model_dir = "trained_models/WaveSurface/RiemannianBrownianMotion/trained_20250313-151537_h[32, 32]_df[8]_dr[8]_lr0.001_epochs9000_annealed_2nd"
 trainer = Trainer.load_from_pretrained(model_dir)
 
 # Run geometry error once

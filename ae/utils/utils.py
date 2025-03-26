@@ -6,6 +6,7 @@
     set_grad_tracking: turn on/off the parameters of a nn.Module
     select_device: choose the computational device: cpu or gpu (cuda, or mps)
     process_data: take the point cloud/dynamics data and estimate the orthogonal projection
+    compute_orthogonal_projection_from_cov:
 
 """
 

@@ -73,6 +73,7 @@ class DynamicsError:
             for t in range(n_time):
                 expected_z = self.toydata.point_cloud.np_phi(x_coords[i, t], y_coords[i, t])[2]
                 errors[i, t] = np.abs(expected_z - z_coords[i, t])
+
         return errors
 
     def get_standard_test_functions(self):
@@ -84,11 +85,14 @@ class DynamicsError:
         """
         return [
             ("l2 norm", lambda paths: np.linalg.vector_norm(paths, axis=2, ord=2)),
-            ("polynomial", lambda paths: paths[:, :, 0]**2-paths[:, :, 1]*paths[:, :, 2]),
-            ("5th degree", lambda paths: paths[:, :, 0]-paths[:, :, 1]**5),
+            ("polynomial", lambda paths: np.tanh(paths[:, :, 2]**2-paths[:, :, 1]*paths[:, :, 0])),
+            ("5th degree", lambda paths: np.cos(paths[:, :, 2]**2-paths[:, :, 1]**5)),
             ("sin(x1)x3", lambda paths: np.sin(4*paths[:, :, 1])*paths[:, :, 2]),
             ("rational function", lambda paths: paths[:, :, 2]/(1+paths[:, :, 1]**2+paths[:, :, 0]**2)),
-            ("Manifold constraint", self.chart_error_vectorized)
+            ("Manifold constraint", self.chart_error_vectorized),
+            ("x1", lambda paths: paths[:, :, 0]),
+            ("x2", lambda paths: paths[:, :, 1]),
+            ("x3", lambda paths: paths[:, :, 2])
         ]
 
     def analyze_statistical_properties(self, paths_ground_truth, paths_ambient, paths_ae, tn):
