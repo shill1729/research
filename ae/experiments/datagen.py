@@ -4,7 +4,7 @@ from ae.symbolic.diffgeo import RiemannianManifold
 from ae.toydata.pointclouds import PointCloud
 from ae.toydata.surfaces import SurfaceBase
 from ae.toydata.local_dynamics import DynamicsBase
-from ae.utils import process_data
+from ae.utils import process_data, embed_data, random_rotation_matrix
 
 
 class ToyData:
@@ -70,7 +70,7 @@ class ToyData:
         """
         self.point_cloud = self.__get_point_cloud(epsilon, compute_proj)
 
-    def generate_data(self, n, d, seed=None, device="cpu"):
+    def generate_data(self, n, d, seed=None, device="cpu", embed=False):
         """
         Generate and preprocess data. Make sure to use '.set_point_cloud' if you want to change the boundary,
         i.e. for testing beyond the training region.
@@ -79,9 +79,13 @@ class ToyData:
         :param d:
         :param seed:
         :param device:
+        :param embed:
         :return:
         """
         x, _, mu, cov, local_x = self.point_cloud.generate(n, seed=seed)
+        if embed:
+            R = random_rotation_matrix(D=100, seed=None)
+            x, mu, cov = embed_data(x, mu, cov, R)
         x, mu, cov, p, _, orthonormal_frame = process_data(x, mu, cov, d, True, device)
         return {
             "x": x, "mu": mu, "cov": cov, "p": p,

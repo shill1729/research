@@ -17,13 +17,15 @@ from ae.toydata.local_dynamics import DynamicsBase
 
 
 class Trainer:
-    def __init__(self, toy_data: ToyData, params: dict, device="cpu", anneal_tag="not_annealed"):
+    def __init__(self, toy_data: ToyData, params: dict, device="cpu", anneal_tag="not_annealed", embed=False):
         self.toy_data = toy_data
         self.device = torch.device(device)
         self.params = params
         self.anneal_tag = anneal_tag
         self.exp_dir = None
+        self.embed = embed
         self._initialize_models()
+
 
     def _setup_experiment(self):
         base_dir = f"trained_models/{self.toy_data.surface.__class__.__name__}/" \
@@ -68,7 +70,8 @@ class Trainer:
                              self.params["weight_decay"],
                              self.params["batch_size"],
                              self.params["print_freq"])
-        data = self.toy_data.generate_data(self.params["num_points"], self.params["intrinsic_dim"], device=self.device)
+        data = self.toy_data.generate_data(self.params["num_points"], self.params["intrinsic_dim"], device=self.device,
+                                           embed=self.embed)
 
         for model_type, model in self.models.items():
             print(f"Training {model_type} model...")

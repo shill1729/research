@@ -13,7 +13,7 @@ from ae.experiments.training import Trainer
 
 class GeometryError:
     def __init__(self, toydata: ToyData, trainer: Trainer,
-                 eps_max=1., device="cpu", show=False):
+                 eps_max=1., device="cpu", show=False, embed=False):
         self.toydata = toydata
         self.ae_dict = trainer.models
         self.ambient_drift_loss = AmbientDriftLoss()
@@ -25,10 +25,11 @@ class GeometryError:
         self.ambient_diffusion = trainer.ambient_diffusion
         self.trainer = trainer
         self.show = show
+        self.embed = embed
 
     def generate_test_data(self, epsilon=1., n=1000, test_seed=None, device="cpu"):
         self.toydata.set_point_cloud(epsilon, True)
-        return self.toydata.generate_data(n, 2, test_seed, device)
+        return self.toydata.generate_data(n, 2, test_seed, device, embed=self.embed)
 
     def compute_ambient_diff_and_drift(self,
                                        drift_model: AmbientDriftNetwork,

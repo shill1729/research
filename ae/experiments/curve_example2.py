@@ -29,9 +29,9 @@ diff_layers = [16]
 
 # Training parameters
 lr = 0.001
-epochs_ae = 2000
-epochs_diffusion = 2000
-epochs_drift = 2000
+epochs_ae = 9000
+epochs_diffusion = 9000
+epochs_drift = 9000
 weight_decay = 0.
 print_freq = 1000
 first_order_weight = 0.01
@@ -39,9 +39,9 @@ second_order_weight = 0.005
 diffeo_weight = 0.1
 
 # Sample path input
-tn = 0.5
-ntime = 1000
-npaths = 30
+tn = 1.
+ntime = 100
+npaths = 100
 
 # Activation functions
 encoder_act = nn.Tanh()
@@ -54,7 +54,7 @@ diffusion_act = nn.Tanh()
 # ============================================================================
 
 # Pick the manifold and dynamics
-curve = PinchedBellCurve() # If you change this, you need to hard-code the chart constraint
+curve = RationalCurve() # If you change this, you need to hard-code the chart constraint
 dynamics = LangevinHarmonicOscillator()
 manifold = RiemannianManifold(curve.local_coords(), curve.equation())
 local_drift = dynamics.drift(manifold)
@@ -297,7 +297,6 @@ def test_functions(x):
         'tanh_xy': np.tanh(x[..., 0] * x[..., 1]),
         'poly_x2y': x[..., 0] ** 2 * x[..., 1],
         'log_1p_x2y2': np.log(1 + x[..., 0] ** 2 + x[..., 1] ** 2),
-        # TODO: chart constraint is hardcoded
         # 'manifold_constr': np.abs(np.sin(x[..., 0])-x[..., 1])
         'manifold_constr': chart_error_vectorized(x)
     }

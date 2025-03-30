@@ -15,6 +15,59 @@ import numpy as np
 from torch import nn
 
 
+def random_rotation_matrix(D, seed=None):
+    A = np.random.default_rng(seed).standard_normal((D, D))
+    Q, R = np.linalg.qr(A)
+    diag_sign = np.sign(np.diag(R))
+    Q *= diag_sign
+    if np.linalg.det(Q) < 0:
+        Q[:, 0] *= -1
+    return Q
+
+# Padding operator: pad with (D-d) zeros
+def pad(v, target_dim):
+    pad_width = [(0, 0)] * (v.ndim - 1) + [(0, target_dim - v.shape[-1])]
+    return np.pad(v, pad_width, mode='constant')
+
+def embed_data(x, mu, Sigma, R):
+    """
+    Rotate an SDE process in batch.
+
+    Parameters:
+    - x:      (n, d) array of points
+    - mu:     (n, d) array of drifts
+    - Sigma:  (n, d, d) array of covariances
+    - R:      (D, D) rotation matrix (orthogonal)
+
+    Returns:
+    - x_rot:      (n, D) rotated positions
+    - mu_rot:     (n, D) rotated drifts
+    - Sigma_rot:  (n, D, D) rotated covariances
+    """
+    n, d = x.shape
+    D = R.shape[0]
+    assert R.shape == (D, D)
+    assert mu.shape == (n, d)
+    assert Sigma.shape == (n, d, d)
+
+
+
+    # Pad x and mu to shape (n, D)
+    x_padded = pad(x, D)
+    mu_padded = pad(mu, D)
+
+    # Pad Sigma to (n, D, D)
+    Sigma_padded = np.zeros((n, D, D))
+    Sigma_padded[:, :d, :d] = Sigma
+
+    # Apply rotation
+    x_rot = x_padded @ R.T
+    mu_rot = mu_padded @ R.T
+    Sigma_rot = R @ Sigma_padded @ R.T  # shape (n, D, D)
+
+    return x_rot, mu_rot, Sigma_rot
+
+
 def compute_orthogonal_projection_from_cov(cov, d=2):
     """
 

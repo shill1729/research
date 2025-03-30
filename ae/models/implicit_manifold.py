@@ -8,10 +8,21 @@ from ae.models.ffnn import FeedForwardNeuralNet
 
 class FullRankLoss(nn.Module):
     def __init__(self, weight=1., *args, **kwargs):
+        """
+
+        :param weight:
+        :param args:
+        :param kwargs:
+        """
         super().__init__(*args, **kwargs)
         self.weight = weight
 
     def forward(self, df):
+        """
+
+        :param df:
+        :return:
+        """
         norms = torch.linalg.matrix_norm(df, ord=-2)
         return self.weight * torch.sum(torch.exp(-norms ** 2))
 
@@ -32,6 +43,11 @@ class ImplicitManifoldNetwork(nn.Module):
         self.codim = neurons[0] - intrinsic_dim
 
     def forward(self, x: Tensor) -> Tuple[Tensor, Tensor]:
+        """
+
+        :param x:
+        :return:
+        """
         f = self.f(x)
         df = self.f.jacobian_network(x)
         return f, df
@@ -115,10 +131,23 @@ class ImplicitManifoldNetwork(nn.Module):
 
 class HyperSurfaceLoss(nn.Module):
     def __init__(self, weight=1., *args, **kwargs):
+        """
+
+        :param weight:
+        :param args:
+        :param kwargs:
+        """
         super().__init__(*args, **kwargs)
         self.full_rank_loss = FullRankLoss(weight)
 
     def forward(self, model: ImplicitManifoldNetwork, x: Tensor, targets=None):
+        """
+
+        :param model:
+        :param x:
+        :param targets:
+        :return:
+        """
         f, df = model(x)
         manifold_constraint_loss = torch.mean(torch.linalg.vector_norm(f, ord=2, dim=1) ** 2)
         full_rank_loss = self.full_rank_loss(df)
@@ -137,14 +166,14 @@ if __name__ == "__main__":
     seed = None
     num_pts = 50
     # TODO: this implementation requires
-    neurons = [3, 32, 32, 1]
+    neurons = [3, 64, 64, 1]
     fr_weight = 0.5
     lr = 0.001
     epochs = 9000
-    weight_decay = 0.01
-    tn = 5.
-    ntime = 10000
-    npaths = 1
+    weight_decay = 0.
+    tn = 2.5
+    ntime = 5000
+    npaths = 30
     activation = nn.Tanh()
     # Metal has some issues:
     # NotImplementedError: The operator 'aten::_linalg_svd.U' is not currently implemented for the MPS device. If you
@@ -178,4 +207,12 @@ if __name__ == "__main__":
     ax = plt.subplot(111, projection="3d")
     for i in range(npaths):
         ax.plot3D(sample_paths[i, :, 0], sample_paths[i, :, 1], sample_paths[i, :, 2], c="black", alpha=0.8)
+    plt.show()
+
+    # Plot norms to check how the sample path stays on the sphere
+    time_grid = np.linspace(0, tn, ntime+1)
+    average_norms = np.linalg.vector_norm(sample_paths, axis=2, ord=2)**2
+    average_norms = np.mean(average_norms, axis=0)
+    fig = plt.figure()
+    plt.plot(time_grid, average_norms)
     plt.show()

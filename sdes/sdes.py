@@ -334,7 +334,7 @@ class SDE:
 if __name__ == "__main__":
     # A template for 1d Fenyman-Kac problems (solving PDEs with MC estimates of SDEs)
     tn = 0.1
-    ntime = 50
+    ntime = 100
     npaths = 100
     noise_dim = None
     x0 = np.array([1.])
