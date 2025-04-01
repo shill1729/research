@@ -15,10 +15,10 @@ h = 0.001
 n_paths = 120
 device = "cpu"
 # Define a list of time horizons to test
-time_horizons = [0.5]
+time_horizons = [.2]
 
 # Load the pre-trained model: note working directory is currently ae/experiments
-model_dir = "trained_models/WaveSurface/LangevinHarmonicOscillator/trained_20250401-135926_h[128, 128]_df[32]_dr[32]_lr0.001_epochs9000_annealed_2nd"
+model_dir = "trained_models/WaveSurface/LangevinHarmonicOscillator/trained_20250401-135424_h[128, 128]_df[32]_dr[32]_lr0.001_epochs9000_annealed_2nd"
 trainer = Trainer.load_from_pretrained(model_dir, large_dim=large_dim)
 
 # Run geometry error once

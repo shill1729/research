@@ -11,8 +11,8 @@ train_seed = 17
 test_seed = 42
 embedding_seed = 17
 norm = "fro"
-large_dim = 10
-embed = True
+large_dim = None
+embed = False
 
 if __name__ == "__main__":
 
