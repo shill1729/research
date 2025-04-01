@@ -22,6 +22,8 @@ def random_rotation_matrix(D, seed=None):
     Q *= diag_sign
     if np.linalg.det(Q) < 0:
         Q[:, 0] *= -1
+    print("Seed = "+str(seed))
+    print(Q)
     return Q
 
 # Padding operator: pad with (D-d) zeros

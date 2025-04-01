@@ -11,12 +11,15 @@ class ToyData:
     """
 
     """
-    def __init__(self, surface: SurfaceBase, dynamics: DynamicsBase):
+    def __init__(self, surface: SurfaceBase, dynamics: DynamicsBase, large_dim=None, embedding_seed=None):
         """
 
         :param surface:
         :param dynamics:
         """
+        self.embedding_seed = embedding_seed
+        self.random_embedding_matrix = None
+        self.large_dim = large_dim
         self.surface = surface
         self.dynamics = dynamics
         self.manifold = self.__initialize_manifold()
@@ -84,9 +87,17 @@ class ToyData:
         """
         x, _, mu, cov, local_x = self.point_cloud.generate(n, seed=seed)
         if embed:
-            R = random_rotation_matrix(D=100, seed=None)
+            print(self.embedding_seed)
+            R = random_rotation_matrix(D=self.large_dim, seed=self.embedding_seed)
+            self.random_embedding_matrix = R
+
             x, mu, cov = embed_data(x, mu, cov, R)
         x, mu, cov, p, _, orthonormal_frame = process_data(x, mu, cov, d, True, device)
+        print(x.size())
+        print(mu.size())
+        print(cov.size())
+        print(p.size())
+        print(orthonormal_frame.size())
         return {
             "x": x, "mu": mu, "cov": cov, "p": p,
             "orthonormal_frame": orthonormal_frame, "local_x": local_x
@@ -113,4 +124,5 @@ class ToyData:
         for j in range(npaths):
             for i in range(ntime + 1):
                 ambient_paths[j, i, :] = np.squeeze(self.point_cloud.np_phi(*latent_paths[j, i, :]))
+
         return ambient_paths, latent_paths

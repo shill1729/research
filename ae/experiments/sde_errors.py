@@ -86,7 +86,7 @@ class DynamicsError:
         return [
             ("l2 norm", lambda paths: np.linalg.vector_norm(paths, axis=2, ord=2)),
             ("polynomial", lambda paths: np.tanh(paths[:, :, 2]**2-paths[:, :, 1]*paths[:, :, 0])),
-            ("5th degree", lambda paths: np.cos(paths[:, :, 2]**2-paths[:, :, 1]**5)),
+            ("cosine-poly", lambda paths: np.cos(paths[:, :, 2]**2-paths[:, :, 1]**3)*paths[:, :, 0]),
             ("sin(x1)x3", lambda paths: np.sin(4*paths[:, :, 1])*paths[:, :, 2]),
             ("rational function", lambda paths: paths[:, :, 2]/(1+paths[:, :, 1]**2+paths[:, :, 0]**2)),
             ("Manifold constraint", self.chart_error_vectorized),

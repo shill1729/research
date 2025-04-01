@@ -81,9 +81,10 @@ class SamplePathPlotter:
         time_type = "terminal" if terminal else "1st-step"
         terminal_idx = -1 if terminal else 1
         colors = self._get_model_colors()
-        fig, axes = plt.subplots(1, d, figsize=(15, 5))
+        max_plots = min(d, 4)
+        fig, axes = plt.subplots(1, max_plots, figsize=(15, 5))
 
-        for i in range(d):
+        for i in range(max_plots):
             ax = axes[i]
             sns.kdeplot(gt_ensemble[:, terminal_idx, i], label="GT", color=colors["Ground Truth"], linewidth=2, ax=ax)
             if ambient_ensemble is not None:
@@ -375,6 +376,7 @@ class SamplePathPlotter:
         # Generate all plots
         self.plot_time_series_with_errors(results)
         # self.plot_time_series_with_confidence(results)
+        # TODO we nee dto lift the ground truth sample paths whne we e embed.
         self.plot_deviation_of_means(results, False, plot_name="state")
         # self.plot_deviation_of_means(results, True, plot_name="state")
         self.plot_mean_deviation(results, plot_name="state")

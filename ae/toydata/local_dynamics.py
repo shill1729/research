@@ -74,12 +74,14 @@ class RiemannianBrownianMotion(DynamicsBase):
 # TODO: We should refactor this internally, but keep the same names for the folder directory structure.
 class LangevinHarmonicOscillator(DynamicsBase):
 
-    def __init__(self, temperature=0.5):
+    def __init__(self, temperature=1.):
         super().__init__()
         self.temperature = temperature
         self.inverse_temp = 1 / temperature
+        self.volatility = 0.01
 
     def drift(self, manifold: RiemannianManifold):
+        # Define a potential based on the dimension
         if manifold.local_coordinates.shape[0] == 2:
             harmonic_potential = sp.Matrix([
                 self.u-0.5,
@@ -91,20 +93,21 @@ class LangevinHarmonicOscillator(DynamicsBase):
             ])
         else:
             raise NotImplementedError("Only intrinsic dimensions 2 and 1 are implemented")
+        # Collect Riemannian drift plus potential drift
         manifold_drift = manifold.local_bm_drift()
-        manifold_potential = manifold.metric_tensor().inv() * harmonic_potential * self.inverse_temp
-        drift_term = -0.5 * manifold_potential + manifold_drift
+        manifold_potential = -0.5 * manifold.metric_tensor().inv() * harmonic_potential
+        drift_term = manifold_potential + manifold_drift * self.volatility
         return drift_term
 
     def diffusion(self, manifold: RiemannianManifold):
         manifold_diffusion = manifold.local_bm_diffusion()
-        return manifold_diffusion
+        return manifold_diffusion * self.volatility
 
 
 class LangevinDoubleWell(DynamicsBase):
     def drift(self, manifold: RiemannianManifold):
         double_well_potential = sp.Matrix([
-            self.u * (self.u ** 2 - 0.25),
+            self.u * (self.u ** 2 - 0.4),
             self.v / 2
         ])
         manifold_drift = manifold.local_bm_drift()

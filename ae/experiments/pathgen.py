@@ -8,7 +8,7 @@ from ae.experiments.datagen import ToyData
 from ae.experiments.training import Trainer
 from ae.models.local_neural_sdes import AutoEncoderDiffusion
 from sdes.sdes import SDE
-
+from ae.utils import random_rotation_matrix, embed_data, pad
 
 class SamplePathGenerator:
     def __init__(self, toydata: ToyData, trainer: Trainer):
@@ -25,6 +25,7 @@ class SamplePathGenerator:
         self.ae_paths = None
         self.x0 = None
         self.z0_dict = None
+
 
     @staticmethod
     def __generate_paths_ae(z0, model: AutoEncoderDiffusion, tn, npaths, ntime):
@@ -60,7 +61,7 @@ class SamplePathGenerator:
         print("l2 Recon Error for x0 = " + str(np.linalg.vector_norm(x0_hat - x0_numpy, ord=2)))
         return z0_numpy
 
-    def get_best_point(self, num_samples=1000, seed=None):
+    def get_best_point(self, num_samples=1000, seed=None, embed=False):
         """
         Generate random points and find the single point that minimizes
         the maximum reconstruction error over all models.
@@ -73,8 +74,9 @@ class SamplePathGenerator:
         """
         # Make sure we are generating in the original interior
         self.toydata.set_point_cloud()
-        x0_samples = self.toydata.point_cloud.generate(num_samples, seed=seed)[0]  # numpy (num_samples, D)
-
+        # x0_samples = self.toydata.point_cloud.generate(num_samples, seed=seed)[0]  # numpy (num_samples, D)
+        d = self.toydata.point_cloud.dimension
+        x0_samples = self.toydata.generate_data(num_samples, d, None, "cpu", embed)["x"]
         best_x0 = None
         best_max_recon_error = float("inf")
 
@@ -85,6 +87,7 @@ class SamplePathGenerator:
             max_recon_error = float("-inf")  # Track max error for this point
 
             for name, model in self.trainer.models.items():
+                print(x0_torch.size())
                 z0_tensor = model.autoencoder.encoder(x0_torch)
                 x0_hat = model.autoencoder.decoder(z0_tensor).detach().numpy().squeeze(0)
 
@@ -101,7 +104,7 @@ class SamplePathGenerator:
 
         return best_x0
 
-    def generate_paths(self, tn, ntime, npaths, seed=None):
+    def generate_paths(self, tn, ntime, npaths, seed=None, embed=False, large_dim=3):
         """
         Generate ensemble paths for ground truth, ambient model, and autoencoder models
 
@@ -117,7 +120,7 @@ class SamplePathGenerator:
         """
         # TODO: right now the initial point 'x0' is generated internally. Do we want the option to pass it?
         # x0 = self.toydata.point_cloud.generate(1, seed=seed)[0]  # numpy (D,)
-        x0 = self.get_best_point()
+        x0 = self.get_best_point(embed=embed).detach().numpy()
         print("Point with smallest reconstruction error")
         print(x0)
         # x0 = self.toydata.point_cloud.np_phi(*[0.8, 0.8]).squeeze(1)
@@ -126,8 +129,20 @@ class SamplePathGenerator:
         x0_torch = torch.tensor(x0, dtype=torch.float32).unsqueeze(0)  # torch (1,D)
         z0_dict = {name: self.__get_z0(model, x0_torch, name) for name, model in self.trainer.models.items()}
         ambient_gt, local_gt = self.toydata.ground_truth_ensemble(x0, tn, ntime, npaths)
-        vanilla_ambient_paths = self.ambient_sde.sample_ensemble(x0, tn, ntime, npaths, noise_dim=3)
+        # Embed ground-truth ambient paths if testing in D >> 3
+        if embed:
+            embedded_gt = np.zeros((npaths, ntime+1, large_dim))
+            for i in range(npaths):
+                Q = random_rotation_matrix(D=large_dim, seed=self.toydata.embedding_seed)
+                embedded_gt[i] = pad(ambient_gt[i], large_dim) @ Q.T
+
+
+
+        vanilla_ambient_paths = self.ambient_sde.sample_ensemble(x0, tn, ntime, npaths, noise_dim=large_dim)
         ae_paths = {name: self.__generate_paths_ae(z0_dict[name], model, tn, npaths, ntime) for name, model in self.trainer.models.items()}
         ambient_ae_paths = {name: ae_paths[name][0] for name in self.trainer.models.keys()}
         local_ae_paths = {name: ae_paths[name][1] for name in self.trainer.models.keys()}
-        return ambient_gt, vanilla_ambient_paths, ambient_ae_paths, local_gt, local_ae_paths
+        if embed:
+            return embedded_gt, vanilla_ambient_paths, ambient_ae_paths, local_gt, local_ae_paths
+        else:
+            return ambient_gt, vanilla_ambient_paths, ambient_ae_paths, local_gt, local_ae_paths

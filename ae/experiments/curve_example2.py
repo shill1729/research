@@ -34,9 +34,9 @@ epochs_diffusion = 9000
 epochs_drift = 9000
 weight_decay = 0.
 print_freq = 1000
-first_order_weight = 0.01
+first_order_weight = 0.05
 second_order_weight = 0.005
-diffeo_weight = 0.1
+diffeo_weight = 0.05
 
 # Sample path input
 tn = 1.
@@ -46,8 +46,8 @@ npaths = 100
 # Activation functions
 encoder_act = nn.Tanh()
 decoder_act = nn.Tanh()
-drift_act = nn.Tanh()
-diffusion_act = nn.Tanh()
+drift_act = nn.CELU()
+diffusion_act = nn.CELU()
 
 # ============================================================================
 # Generate data and train models

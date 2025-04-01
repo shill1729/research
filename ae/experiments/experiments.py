@@ -3,25 +3,28 @@ from ae.experiments.sde_errors import DynamicsError
 from ae.experiments.training import Trainer
 from ae.experiments.path_computations import compute_increments
 from ae.experiments.helpers import get_time_horizon_name, print_dict
+from train import large_dim, embed, embedding_seed
 import numpy as np
 
 # Settings that remain constant
 show_geo = False
-show_stats = True
+show_stats = False
 eps_grid_size = 10
 num_test = 20000
-h = 0.01
-n_paths = 30
+h = 0.001
+n_paths = 120
 device = "cpu"
 # Define a list of time horizons to test
-time_horizons = [2.]
+time_horizons = [0.5]
 
 # Load the pre-trained model: note working directory is currently ae/experiments
-model_dir = "trained_models/ProductSurface/RiemannianBrownianMotion/trained_20250317-165534_h[32]_df[32]_dr[32]_lr0.001_epochs9000_not_annealed"
-trainer = Trainer.load_from_pretrained(model_dir)
+model_dir = "trained_models/WaveSurface/LangevinHarmonicOscillator/trained_20250401-135926_h[128, 128]_df[32]_dr[32]_lr0.001_epochs9000_annealed_2nd"
+trainer = Trainer.load_from_pretrained(model_dir, large_dim=large_dim)
 
 # Run geometry error once
-geometry = GeometryError(trainer.toy_data, trainer, 1., device, show=show_geo)
+print(trainer.toy_data.large_dim)
+trainer.toy_data.embedding_seed = embedding_seed
+geometry = GeometryError(trainer.toy_data, trainer, 1., device, show=show_geo, embed=embed)
 geometry.compute_and_plot_errors(eps_grid_size, num_test, None, device)
 
 
@@ -38,7 +41,7 @@ for tn in time_horizons:
 
     # Dynamics errors
     dynamics_error = DynamicsError(trainer.toy_data, trainer, tn, show=show_stats)
-    gt, at, aes, gt_local, aes_local = dynamics_error.sample_path_generator.generate_paths(tn, n_time, n_paths, None)
+    gt, at, aes, gt_local, aes_local = dynamics_error.sample_path_generator.generate_paths(tn, n_time, n_paths, None, embed, large_dim)
 
     # Plot ambient sample paths (only if the number of paths is small enough)
     # if n_paths < 5000:

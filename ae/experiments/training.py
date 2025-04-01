@@ -101,7 +101,7 @@ class Trainer:
         print("Models successfully saved.")
 
     @classmethod
-    def load_from_pretrained(cls, pretrained_dir, device="cpu"):
+    def load_from_pretrained(cls, pretrained_dir, device="cpu", large_dim=None):
         """
         Load a Trainer from a pretrained directory.
 
@@ -129,7 +129,7 @@ class Trainer:
             params = json.load(f)
 
         # Dynamically instantiate the correct ToyData object
-        toy_data = cls._instantiate_toy_data(surface_name, dynamics_name, params)
+        toy_data = cls._instantiate_toy_data(surface_name, dynamics_name, params, large_dim)
 
         # Initialize the trainer
         trainer = cls(toy_data, params, device)
@@ -142,7 +142,7 @@ class Trainer:
         return trainer
 
     @staticmethod
-    def _instantiate_toy_data(surface_name, dynamics_name, params):
+    def _instantiate_toy_data(surface_name, dynamics_name, params, large_dim=None):
         """
         Dynamically creates a ToyData instance based on surface and dynamics class names.
 
@@ -181,7 +181,7 @@ class Trainer:
         dynamics = dynamics_class()
         # dynamics = dynamics_class(surface, **params.get("dynamics_params", {}))
 
-        return ToyData(surface, dynamics)
+        return ToyData(surface, dynamics, large_dim)
 
     def _load_model_weights(self, pretrained_dir):
         """
