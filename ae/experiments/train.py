@@ -4,15 +4,25 @@ from ae.experiments.datagen import ToyData
 from ae.experiments.training import Trainer
 from ae.toydata.local_dynamics import *
 from ae.toydata.surfaces import *
-
+# TODO: 4/3/2025
+#  1. Start all sample paths either near the training boundary or beyond it. This should demonstrate
+#  that our penalized models perform better since they have lower extrapolation error
+#  2. Plot the following.
+#     a. Generate a large amount of test data (x,y,z).
+#     Plot in the ambient space and plot the local coordinates (x,y) on the ground z=0. Color all of them
+#     according to whether the local coordinates (x,y) is in the training region [a,b]^2 or not.
+#     (The testing data is generated in [a-\epsilon, b+\epsilon]^2) for a sufficiently large $\epsilon$.
+#     b. Do this for each AE-model and plot the model's surface along the point cloud.
 
 device = torch.device("cpu")
-train_seed = 17
-test_seed = 42
+train_seed = 42
+test_seed = 17
 embedding_seed = 17
 norm = "fro"
+# Set large dim = 5,10, 100 for embedding into higher dimension. Note this is imported into 'experiments.py'! So make
+# sure it lines up.
 large_dim = None
-embed = False
+embed = False # Bool for embedding or not
 
 if __name__ == "__main__":
 
@@ -25,24 +35,24 @@ if __name__ == "__main__":
     eps_grid_size = 10
     # The intrinsic and extrinsic dimensions.
     extrinsic_dim, intrinsic_dim = 3, 2
-    hidden_dims = [128, 128]
-    diffusion_layers = [32]
-    drift_layers = [32]
+    hidden_dims = [32]
+    diffusion_layers = [8]
+    drift_layers = [8]
     lr = 0.001
-    weight_decay = 0.0001
+    weight_decay = 0.001
     epochs_ae = 9000
-    epochs_diffusion = 9000
-    epochs_drift = 9000
+    epochs_diffusion = 5000
+    epochs_drift = 5000
     print_freq = 1000
     # Diffeo weight for accumulative orders
-    diffeo_weight_12 = 0.2 # this is the separate diffeo_weight for just the First order and second order
+    diffeo_weight_12 = 0.14 # this is the separate diffeo_weight for just the First order and second order
     # First order weight: 0.08 was good
-    tangent_angle_weight = 0.001
+    tangent_angle_weight = 0.01
     # Second order weights accumulative
     tangent_angle_weight2 = 0.01  # the first order weight for the second order model, if accumulating penalties
-    tangent_drift_weight = 0.01
-    surface = WaveSurface()
-    dynamics = LangevinHarmonicOscillator()
+    tangent_drift_weight = 0.005
+    surface = ProductSurface()
+    dynamics = RiemannianBrownianMotion()
     if embed:
         extrinsic_dim = large_dim
 

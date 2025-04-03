@@ -53,22 +53,28 @@ class FeedForwardNeuralNet(nn.Module):
 
     """
 
-    def __init__(self, neurons: List[int], activations: List[Optional[Callable[..., Any]]]):
+    def __init__(self, neurons: List[int], activations: List[Optional[Callable[..., Any]]], normalize=False):
         """
         Initializes the FeedForwardNeuralNet with the given neurons and activation functions.
 
         Args:
             neurons (list): A list of integers where each integer represents the number of nodes in a layer.
             activations (callable): The list of activation functions to apply after each linear layer
+            normalize (bool): A boolean for whether to apply spectral normalization to the layers.
         """
         super(FeedForwardNeuralNet, self).__init__()
         self.layers = nn.ModuleList()
         self.activations = activations
         self.input_dim = neurons[0]
         self.output_dim = neurons[-1]
+        self.normalize = normalize
 
         for i in range(len(neurons) - 1):
-            self.layers.append(nn.Linear(neurons[i], neurons[i + 1]))
+            layer = nn.Linear(neurons[i], neurons[i + 1])
+            # Apply spectral normalization if specified
+            if normalize:
+                layer = nn.utils.spectral_norm(layer)
+            self.layers.append(layer)
 
     def forward(self, x: Tensor) -> Tensor:
         """

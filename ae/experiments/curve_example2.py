@@ -24,24 +24,24 @@ intrinsic_dim = 1
 extrinsic_dim = 2
 epsilon = 0.2
 hidden_dims = [32]
-drift_layers = [16]
-diff_layers = [16]
+drift_layers = [32]
+diff_layers = [32]
 
 # Training parameters
 lr = 0.001
-epochs_ae = 9000
-epochs_diffusion = 9000
-epochs_drift = 9000
-weight_decay = 0.
+epochs_ae = 15000
+epochs_diffusion = 15000
+epochs_drift = 15000
+weight_decay = 0.001
 print_freq = 1000
-first_order_weight = 0.05
+first_order_weight = 0.01
 second_order_weight = 0.005
-diffeo_weight = 0.05
+diffeo_weight = 0.1
 
 # Sample path input
-tn = 1.
-ntime = 100
-npaths = 100
+tn = 2.
+ntime = 500
+npaths = 500
 
 # Activation functions
 encoder_act = nn.Tanh()
@@ -54,7 +54,7 @@ diffusion_act = nn.CELU()
 # ============================================================================
 
 # Pick the manifold and dynamics
-curve = RationalCurve() # If you change this, you need to hard-code the chart constraint
+curve = RationalCurve()
 dynamics = LangevinHarmonicOscillator()
 manifold = RiemannianManifold(curve.local_coords(), curve.equation())
 local_drift = dynamics.drift(manifold)

@@ -561,4 +561,6 @@ class LocalDriftLoss(nn.Module):
         observed_latent_drift = torch.bmm(dpi, tangent_drift_vector.unsqueeze(2)).squeeze(2)
         latent_sq_error = torch.linalg.vector_norm(model_latent_drift - observed_latent_drift, ord=2, dim=1) ** 2
         latent_drift_mse = torch.mean(latent_sq_error)
+        # jacobian = ae_diffusion.latent_sde.drift_net.jacobian_network(z)
+        # weight_matrix_reg = torch.linalg.matrix_norm(jacobian, ord="fro").mean(dim=0)
         return latent_drift_mse

@@ -53,6 +53,8 @@ class Trainer:
         weights_second_order = LossWeights(diffeomorphism_reg=self.params["diffeo_weight"],
                                            tangent_angle_weight=self.params["tangent_angle_weight2"],
                                            tangent_drift_weight=self.params["tangent_drift_weight"])
+        print("Second order model")
+        print(weights_second_order)
         self.losses = {
             "vanilla": weights_vanilla,
             "first": weights_first_order,

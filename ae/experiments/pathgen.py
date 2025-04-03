@@ -87,7 +87,7 @@ class SamplePathGenerator:
             max_recon_error = float("-inf")  # Track max error for this point
 
             for name, model in self.trainer.models.items():
-                print(x0_torch.size())
+                # print(x0_torch.size())
                 z0_tensor = model.autoencoder.encoder(x0_torch)
                 x0_hat = model.autoencoder.decoder(z0_tensor).detach().numpy().squeeze(0)
 
@@ -101,8 +101,19 @@ class SamplePathGenerator:
             if max_recon_error < best_max_recon_error:
                 best_max_recon_error = max_recon_error
                 best_x0 = x0
-
         return best_x0
+
+    def get_bd_point(self):
+        """
+
+        :return:
+        """
+        self.toydata.set_point_cloud()
+        # TODO: does not work for embedded data
+        a = self.toydata.point_cloud.bounds[0][0] - 0.01
+        b = self.toydata.point_cloud.bounds[0][1] + 0.01
+        bd_x0 = self.toydata.point_cloud.np_phi(a, b).reshape((1, 3)).squeeze(0)
+        return bd_x0
 
     def generate_paths(self, tn, ntime, npaths, seed=None, embed=False, large_dim=3):
         """
@@ -120,7 +131,8 @@ class SamplePathGenerator:
         """
         # TODO: right now the initial point 'x0' is generated internally. Do we want the option to pass it?
         # x0 = self.toydata.point_cloud.generate(1, seed=seed)[0]  # numpy (D,)
-        x0 = self.get_best_point(embed=embed).detach().numpy()
+        # x0 = self.get_best_point(embed=embed).detach().numpy()
+        x0 = self.get_bd_point()
         print("Point with smallest reconstruction error")
         print(x0)
         # x0 = self.toydata.point_cloud.np_phi(*[0.8, 0.8]).squeeze(1)
@@ -135,9 +147,6 @@ class SamplePathGenerator:
             for i in range(npaths):
                 Q = random_rotation_matrix(D=large_dim, seed=self.toydata.embedding_seed)
                 embedded_gt[i] = pad(ambient_gt[i], large_dim) @ Q.T
-
-
-
         vanilla_ambient_paths = self.ambient_sde.sample_ensemble(x0, tn, ntime, npaths, noise_dim=large_dim)
         ae_paths = {name: self.__generate_paths_ae(z0_dict[name], model, tn, npaths, ntime) for name, model in self.trainer.models.items()}
         ambient_ae_paths = {name: ae_paths[name][0] for name in self.trainer.models.keys()}

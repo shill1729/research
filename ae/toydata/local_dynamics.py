@@ -78,7 +78,7 @@ class LangevinHarmonicOscillator(DynamicsBase):
         super().__init__()
         self.temperature = temperature
         self.inverse_temp = 1 / temperature
-        self.volatility = 0.01
+        self.volatility = 0.5
 
     def drift(self, manifold: RiemannianManifold):
         # Define a potential based on the dimension
@@ -109,13 +109,13 @@ class LangevinDoubleWell(DynamicsBase):
         double_well_potential = sp.Matrix([
             self.u * (self.u ** 2 - 0.4),
             self.v / 2
-        ])
+        ])/8
         manifold_drift = manifold.local_bm_drift()
         potential = manifold.metric_tensor().inv() * double_well_potential
-        return -0.5 * potential + manifold_drift
+        return -0.5 * potential + manifold_drift * 0.05
 
     def diffusion(self, manifold: RiemannianManifold):
-        return manifold.local_bm_diffusion()
+        return manifold.local_bm_diffusion() * 0.05
 
 
 class LangevinGaussianWell(DynamicsBase):
@@ -171,13 +171,13 @@ class ArbitraryMotion(DynamicsBase):
         return sp.Matrix([
             -(self.u - 0.5),
              (self.u - 0.5)
-        ]) / 10
+        ]) / 4
 
     def diffusion(self, manifold=None):
         return sp.Matrix([
             [0.1 * sp.sin(self.u) + self.v ** 2, 0.05 * sp.cos(self.v) + self.u],
             [0.02 * self.u * self.v, 0.1 + 0.1 * self.v]
-        ]) / 10
+        ]) / 20
 
 
 class ArbitraryMotion2(DynamicsBase):

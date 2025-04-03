@@ -111,7 +111,7 @@ class WaveSurface(SurfaceBase):
 
 
 class Paraboloid(SurfaceBase):
-    def __init__(self, a=6, b=6):
+    def __init__(self, a=3, b=3):
         super().__init__()
         self.a = a
         self.b = b
