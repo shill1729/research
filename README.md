@@ -20,6 +20,24 @@ or
 python -m pip install "ae @ git+https://github.com/shill1729/research.git"
 ```
 
+## How to run examples:
+Install the package using
+```
+python -m pip install "ae @ git+https://github.com/shill1729/research.git"
+```
+1. Create a new project in your IDE.
+2. Create a directory named 'examples' and a subdirectory named 'surfaces'
+3. Copy 'train.py' and 'inference.py' from 'ae/examples/surfaces'. Put them outside of the above directories.
+4. Run 'train.py' after editing the parameters to your liking. At the end of its output it will print the file path it saved to.
+5. Copy the file path from step 4. and edit the 'inference.py' script to use it.
+6. Run 'inference.py'.
+
+All of the plots should be saved in the SurfaceName/Dynamics/...
+
+If the 'inference.py' has issues with the file-path, check your working directory.
+
+
+
 ## Features
 The package has functions/classes for
 
