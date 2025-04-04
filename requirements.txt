@@ -5,3 +5,5 @@ torch~=2.6.0
 sympy~=1.13.1
 pandas~=2.2.2
 setuptools~=75.8.0
+seaborn~=0.13.2
+streamlit~=1.42.2
