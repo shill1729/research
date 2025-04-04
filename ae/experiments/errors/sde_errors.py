@@ -1,9 +1,12 @@
-from ae.experiments.datagen import ToyData
-from ae.experiments.training import Trainer
-from ae.experiments.pathgen import SamplePathGenerator
-from ae.experiments.path_plotting import SamplePathPlotter
-from ae.experiments.path_computations import *
-from ae.experiments.helpers import get_time_horizon_name
+from ae.toydata import ToyData
+from ae.experiments import Trainer
+from ae.experiments.samplepaths import SamplePathGenerator
+from ae.experiments.samplepaths import SamplePathPlotter
+from ae.experiments.samplepaths import (feynman_kac_formula, compute_mean_sample_paths,
+                                                          compute_variance_sample_paths,
+                                                          compute_covariance_sample_paths, compute_increments,
+                                                          compute_norms, apply_function)
+from ae.experiments.training.helpers import get_time_horizon_name
 import numpy as np
 
 

@@ -1,9 +1,8 @@
-import numpy as np
 import torch.nn as nn
 import torch
 import matplotlib.pyplot as plt
 
-from sdes import SDE
+from ae.sdes import SDE
 
 from ae.toydata.curves import *
 from ae.toydata.local_dynamics import *
@@ -12,7 +11,6 @@ from ae.utils import process_data
 from ae.models import AutoEncoder, LatentNeuralSDE, AutoEncoderDiffusion, fit_model, ThreeStageFit
 from ae.models import LossWeights, AmbientDriftNetwork, AmbientDiffusionNetwork
 from ae.models.losses import AmbientDriftLoss, AmbientDiffusionLoss
-from scipy import stats
 
 # Model configuration parameters
 train_seed = None  # Set fixed seeds for reproducibility
@@ -29,11 +27,11 @@ diff_layers = [32]
 
 # Training parameters
 lr = 0.001
-epochs_ae = 15000
-epochs_diffusion = 15000
-epochs_drift = 15000
+epochs_ae = 2
+epochs_diffusion = 2
+epochs_drift = 2
 weight_decay = 0.001
-print_freq = 1000
+print_freq = 1
 first_order_weight = 0.01
 second_order_weight = 0.005
 diffeo_weight = 0.1

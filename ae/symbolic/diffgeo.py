@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 from sympy import Matrix, MutableDenseNDimArray
 from ae.symbolic.sde_cas import matrix_divergence
-from sdes.sdes import SDE
+from ae.sdes import SDE
 
 
 class RiemannianManifold:

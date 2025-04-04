@@ -4,8 +4,8 @@ import inspect
 import torch
 import torch.nn as nn
 
-from ae.experiments.datagen import ToyData
-from ae.experiments.helpers import setup_experiment_dir
+from ae.toydata.datagen import ToyData
+from ae.experiments.training.helpers import setup_experiment_dir
 from ae.models.ambient_sdes import AmbientDriftNetwork, AmbientDiffusionNetwork
 from ae.models.autoencoder import AutoEncoder
 from ae.models.fitting import ThreeStageFit, fit_model
@@ -28,7 +28,7 @@ class Trainer:
 
 
     def _setup_experiment(self):
-        base_dir = f"trained_models/{self.toy_data.surface.__class__.__name__}/" \
+        base_dir = f"../examples/surfaces/trained_models/{self.toy_data.surface.__class__.__name__}/" \
                    f"{self.toy_data.dynamics.__class__.__name__}"
         return setup_experiment_dir(self.params, base_dir, self.anneal_tag)
 
@@ -206,14 +206,14 @@ class Trainer:
 
 
 if __name__ == "__main__":
-    from ae.experiments.manifold_errors import GeometryError
-    from ae.experiments.sde_errors import DynamicsError
+    from ae.experiments.errors.manifold_errors import GeometryError
+    from ae.experiments.errors.sde_errors import DynamicsError
     eps_grid_size= 10
     num_test = 20000
     tn = 0.5
     ntime = 1000
     npaths = 30
-    model_dir = "trained_models/Paraboloid/LangevinHarmonicOscillator/trained_20250307-231744_h[16]_df[16]_dr[16]_lr0.001_epochs9000_not_annealed"
+    model_dir = "../examples/surfaces/trained_models/Paraboloid/LangevinHarmonicOscillator/trained_20250307-231744_h[16]_df[16]_dr[16]_lr0.001_epochs9000_not_annealed"
     trainer = Trainer.load_from_pretrained(model_dir)
     device = "cpu"
     geometry = GeometryError(trainer.toy_data, trainer, 1., device)

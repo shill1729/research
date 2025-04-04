@@ -4,11 +4,11 @@
 import torch
 import numpy as np
 
-from ae.experiments.datagen import ToyData
-from ae.experiments.training import Trainer
+from ae.toydata.datagen import ToyData
+from ae.experiments.training.training import Trainer
 from ae.models.local_neural_sdes import AutoEncoderDiffusion
-from sdes.sdes import SDE
-from ae.utils import random_rotation_matrix, embed_data, pad
+from ae.sdes import SDE
+from ae.utils import random_rotation_matrix, pad
 
 class SamplePathGenerator:
     def __init__(self, toydata: ToyData, trainer: Trainer):
@@ -108,10 +108,12 @@ class SamplePathGenerator:
 
         :return:
         """
-        self.toydata.set_point_cloud()
+        # self.toydata.set_point_cloud()
         # TODO: does not work for embedded data
-        a = self.toydata.point_cloud.bounds[0][0] - 0.01
-        b = self.toydata.point_cloud.bounds[0][1] + 0.01
+        if self.toydata.large_dim is not None:
+            raise NotImplemented("Sampling from the boundary for embedded data is not implemented yet.")
+        a = self.toydata.surface.bounds()[0][0] - 0.01
+        b = self.toydata.surface.bounds()[0][1] + 0.01
         bd_x0 = self.toydata.point_cloud.np_phi(a, b).reshape((1, 3)).squeeze(0)
         return bd_x0
 

@@ -1,6 +1,6 @@
 import sympy as sp
 from typing import Tuple, List
-from sdes.sdes import SDE
+from ae.sdes import SDE
 from ae.toydata.sampler import ImportanceSampler
 from ae.symbolic.diffgeo import RiemannianManifold
 from matplotlib.patches import Ellipse
@@ -101,7 +101,7 @@ class PointCloud:
 
         :param n: Number of points to generate
         :param seed: random seed
-        :return: Tuple of (points, weights, extrinsic_drifts, extrinsic_covariances)
+        :return: Tuple of (points, weights, extrinsic_drifts, extrinsic_covariances, local_x)
         """
         param_samples, weights = self.sampler.sample(n, seed)
         points = np.array([self.np_phi(*sample) for sample in param_samples])

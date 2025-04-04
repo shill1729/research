@@ -84,8 +84,8 @@ class LangevinHarmonicOscillator(DynamicsBase):
         # Define a potential based on the dimension
         if manifold.local_coordinates.shape[0] == 2:
             harmonic_potential = sp.Matrix([
-                self.u-0.5,
-                self.v-0.5
+                self.u-2.5,
+                self.v-2.5
             ])
         elif manifold.local_coordinates.shape[0] == 1:
             harmonic_potential = sp.Matrix([

@@ -2,14 +2,14 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 
-from ae.experiments.datagen import ToyData
+from ae.toydata.datagen import ToyData
 from ae.models.local_neural_sdes import AutoEncoderDiffusion
 from ae.models.losses import TotalLoss, AmbientDriftLoss, AmbientDiffusionLoss, LossWeights
 from ae.models.ambient_sdes import AmbientDriftNetwork, AmbientDiffusionNetwork
 from ae.utils.performance_analysis import compute_test_losses
-from ae.experiments.helpers import save_plot
-from ae.experiments.training import Trainer
-
+from ae.experiments.training.helpers import save_plot
+from ae.experiments.training.training import Trainer
+from ae.utils.plot_functions import plot_interior_boundary_highlight, plot_interior_boundary_recon
 
 class GeometryError:
     def __init__(self, toydata: ToyData, trainer: Trainer,
@@ -192,3 +192,10 @@ class GeometryError:
             plt.show()
         save_plot(fig, self.trainer.exp_dir, plot_name="diffusion_bd_errors")
         plt.close(fig)
+
+    def plot_int_bd_surface(self, epsilon=0.5):
+        for name, model in self.trainer.models.items():
+            fig = plot_interior_boundary_highlight(epsilon, self.toydata, model, name)
+            save_plot(fig, self.trainer.exp_dir, plot_name="interior_boundary_highlight_gt_pts")
+            fig = plot_interior_boundary_recon(epsilon, self.toydata, model, name)
+            save_plot(fig, self.trainer.exp_dir, plot_name="interior_boundary_highlight_recon_pts")

@@ -239,7 +239,7 @@ def lift_path(xt, f, m=3):
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
-    from sdes.sde_solvers import euler_maruyama
+    from ae.sdes import euler_maruyama
 
     x, y = sp.symbols("x y", real=True)
     f = sp.Matrix([x ** 2 + x * y ** 2])

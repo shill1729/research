@@ -1,5 +1,5 @@
 import matplotlib.pyplot as plt
-from ae.experiments.training import Trainer
+from ae.experiments.training.training import Trainer
 
 num_test = 1000
 device = "cpu"

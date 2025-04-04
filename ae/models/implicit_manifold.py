@@ -161,7 +161,7 @@ if __name__ == "__main__":
     import torch
     import torch.nn as nn
     from ae.models import fit_model
-    from sdes import SDE
+    from ae.sdes import SDE
 
     seed = None
     num_pts = 50

@@ -1,4 +1,4 @@
-from sdes import SDE
+from ae.sdes import SDE
 import numpy as np
 import matplotlib.pyplot as plt
 

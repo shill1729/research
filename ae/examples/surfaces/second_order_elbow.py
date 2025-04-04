@@ -1,6 +1,6 @@
 # Train our second-order model for various values of the penalty-weight and plot the boundary error
 # as a function of this weight.
-from ae.experiments.datagen import ToyData
+from ae.toydata.datagen import ToyData
 from ae.toydata.surfaces import *
 from ae.toydata.local_dynamics import *
 from ae.models.fitting import fit_model

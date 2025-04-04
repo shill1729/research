@@ -1,7 +1,7 @@
 import torch
 
-from ae.experiments.datagen import ToyData
-from ae.experiments.training import Trainer
+from ae.toydata import ToyData
+from ae.experiments import Trainer
 from ae.toydata.local_dynamics import *
 from ae.toydata.surfaces import *
 # TODO: 4/3/2025
@@ -15,11 +15,12 @@ from ae.toydata.surfaces import *
 #     b. Do this for each AE-model and plot the model's surface along the point cloud.
 
 device = torch.device("cpu")
-train_seed = 42
-test_seed = 17
+train_seed = None
+test_seed = None
 embedding_seed = 17
 norm = "fro"
-# Set large dim = 5,10, 100 for embedding into higher dimension. Note this is imported into 'experiments.py'! So make
+eps_max = 0.5
+# Set large dim = 5,10, 100 for embedding into higher dimension. Note this is imported into 'inference.py'! So make
 # sure it lines up.
 large_dim = None
 embed = False # Bool for embedding or not
@@ -28,30 +29,30 @@ if __name__ == "__main__":
 
     # torch.manual_seed(train_seed)
     # Point cloud parameters
-    num_points = 50
+    num_points = 30
     num_test = 20000
-    batch_size = 40
-    eps_max = 0.6
+    batch_size = 20
+
     eps_grid_size = 10
     # The intrinsic and extrinsic dimensions.
     extrinsic_dim, intrinsic_dim = 3, 2
-    hidden_dims = [32]
-    diffusion_layers = [16]
-    drift_layers = [16]
+    hidden_dims = [2]
+    diffusion_layers = [2]
+    drift_layers = [2]
     lr = 0.001
-    weight_decay = 0.001
-    epochs_ae = 9000
-    epochs_diffusion = 9000
-    epochs_drift = 9000
-    print_freq = 1000
+    weight_decay = 0.01
+    epochs_ae = 2
+    epochs_diffusion = 2
+    epochs_drift = 2
+    print_freq = 1
     # Diffeo weight for accumulative orders
-    diffeo_weight_12 = 0.14 # this is the separate diffeo_weight for just the First order and second order
+    diffeo_weight_12 = 0.2 # this is the separate diffeo_weight for just the First order and second order
     # First order weight: 0.08 was good
-    tangent_angle_weight = 0.01
+    tangent_angle_weight = 0.2
     # Second order weights accumulative
-    tangent_angle_weight2 = 0.01  # the first order weight for the second order model, if accumulating penalties
-    tangent_drift_weight = 0.005
-    surface = ProductSurface()
+    tangent_angle_weight2 = 0.05  # the first order weight for the second order model, if accumulating penalties
+    tangent_drift_weight = 0.05
+    surface = Paraboloid()
     dynamics = RiemannianBrownianMotion()
     if embed:
         extrinsic_dim = large_dim
@@ -83,15 +84,15 @@ if __name__ == "__main__":
 
     # TODO refactor this so we're not just commenting out things
     # No annealing:
-    # anneal_weights = None
+    anneal_weights = None
 
     # Linearly increasing tangent drift weight
     # anneal_weights = {"tangent_drift_weight": lambda epoch: tangent_drift_weight * (epoch / epochs_ae) if epoch >
     # np.round(epochs_ae / 5) else 0.}
 
     # Constant tangent drift weight after warm start
-    anneal_weights = {"tangent_drift_weight": lambda epoch: tangent_drift_weight if epoch >
-                                                                                    np.round(epochs_ae / 4) else 0.}
+    # anneal_weights = {"tangent_drift_weight": lambda epoch: tangent_drift_weight if epoch >
+    #                                                                                 np.round(epochs_ae / 4) else 0.}
 
     anneal_tag = "annealed_2nd" if anneal_weights is not None else "not_annealed"
 

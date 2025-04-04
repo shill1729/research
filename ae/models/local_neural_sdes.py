@@ -6,7 +6,7 @@ from torch import Tensor
 
 from ae.models.ffnn import FeedForwardNeuralNet
 from ae.models.autoencoder import AutoEncoder
-from sdes.sdes import SDE
+from ae.sdes import SDE
 
 
 # The Second order term coming from Ito's applied to vector valued functions (by applying Ito's component wise)

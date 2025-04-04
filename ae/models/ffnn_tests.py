@@ -11,8 +11,6 @@ import torch
 
 from ae.models.ffnn import FeedForwardNeuralNet
 from ae.models.norms import frobenius_inner_product_vec
-import tracemalloc
-import resource
 
 import resource
 import time

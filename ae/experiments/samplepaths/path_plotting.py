@@ -1,8 +1,8 @@
-from ae.experiments.datagen import ToyData
-from ae.experiments.training import Trainer
-from ae.experiments.pathgen import SamplePathGenerator
-from ae.experiments.path_computations import *
-from ae.experiments.helpers import save_plot, get_time_horizon_name
+from ae.toydata.datagen import ToyData
+from ae.experiments.training.training import Trainer
+from ae.experiments.samplepaths.pathgen import SamplePathGenerator
+from ae.experiments.samplepaths.path_computations import *
+from ae.experiments.training.helpers import save_plot, get_time_horizon_name
 
 import os
 import numpy as np
