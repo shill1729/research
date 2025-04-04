@@ -3,6 +3,7 @@ import json
 import inspect
 import torch
 import torch.nn as nn
+from pathlib import Path
 
 from ae.toydata.datagen import ToyData
 from ae.experiments.training.helpers import setup_experiment_dir
@@ -27,9 +28,18 @@ class Trainer:
         self._initialize_models()
 
 
+    # def _setup_experiment(self):
+    #     base_dir = f"examples/surfaces/trained_models/{self.toy_data.surface.__class__.__name__}/" \
+    #                f"{self.toy_data.dynamics.__class__.__name__}"
+    #     return setup_experiment_dir(self.params, base_dir, self.anneal_tag)
     def _setup_experiment(self):
-        base_dir = f"examples/surfaces/trained_models/{self.toy_data.surface.__class__.__name__}/" \
-                   f"{self.toy_data.dynamics.__class__.__name__}"
+        # Absolute path to the project root (2 levels up from this file)
+        root_dir = Path(__file__).resolve().parents[1]
+
+        base_dir = root_dir / "examples" / "surfaces" / "trained_models" / \
+                   self.toy_data.surface.__class__.__name__ / \
+                   self.toy_data.dynamics.__class__.__name__
+
         return setup_experiment_dir(self.params, base_dir, self.anneal_tag)
 
     def _initialize_models(self):
