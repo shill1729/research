@@ -28,7 +28,7 @@ class Trainer:
 
 
     def _setup_experiment(self):
-        base_dir = f"../examples/surfaces/trained_models/{self.toy_data.surface.__class__.__name__}/" \
+        base_dir = f"examples/surfaces/trained_models/{self.toy_data.surface.__class__.__name__}/" \
                    f"{self.toy_data.dynamics.__class__.__name__}"
         return setup_experiment_dir(self.params, base_dir, self.anneal_tag)
 
