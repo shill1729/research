@@ -112,42 +112,73 @@ class Trainer:
         torch.save(self.ambient_diffusion.state_dict(), os.path.join(self.exp_dir, "ambient_diffusion.pth"))
         print("Models successfully saved.")
 
+    # @classmethod
+    # def load_from_pretrained(cls, pretrained_dir, device="cpu", large_dim=None):
+    #     """
+    #     Load a Trainer from a pretrained directory.
+    #
+    #     The directory must follow the structure:
+    #     `trained_models/{surface}/{dynamics}/trained_...`
+    #
+    #     Args:
+    #         pretrained_dir (str): Path to the directory containing the pretrained model.
+    #         device (str or torch.device): Device to load the model onto.
+    #
+    #     Returns:
+    #         Trainer: A Trainer instance initialized with the pretrained weights.
+    #     """
+    #     # Extract surface and dynamics from the directory structure
+    #     path_parts = pretrained_dir.split(os.sep)
+    #     if len(path_parts) < 3:
+    #         raise ValueError("Pretrained directory structure should be 'trained_models/{surface}/{dynamics}/...'")
+    #
+    #     surface_name = path_parts[-3]
+    #     dynamics_name = path_parts[-2]
+    #
+    #     # Load the configuration file
+    #     config_path = os.path.join(pretrained_dir, "config.json")
+    #     with open(config_path, "r") as f:
+    #         params = json.load(f)
+    #
+    #     # Dynamically instantiate the correct ToyData object
+    #     toy_data = cls._instantiate_toy_data(surface_name, dynamics_name, params, large_dim)
+    #
+    #     # Initialize the trainer
+    #     trainer = cls(toy_data, params, device)
+    #     trainer.exp_dir = pretrained_dir  # Override experiment directory
+    #
+    #     # Load model weights
+    #     trainer._load_model_weights(pretrained_dir)
+    #
+    #     print(f"Successfully loaded model from {pretrained_dir}")
+    #     return trainer
     @classmethod
     def load_from_pretrained(cls, pretrained_dir, device="cpu", large_dim=None):
         """
         Load a Trainer from a pretrained directory.
 
-        The directory must follow the structure:
-        `trained_models/{surface}/{dynamics}/trained_...`
-
-        Args:
-            pretrained_dir (str): Path to the directory containing the pretrained model.
-            device (str or torch.device): Device to load the model onto.
-
-        Returns:
-            Trainer: A Trainer instance initialized with the pretrained weights.
+        The directory must contain the structure:
+        '.../trained_models/{surface}/{dynamics}/...'
         """
-        # Extract surface and dynamics from the directory structure
-        path_parts = pretrained_dir.split(os.sep)
-        if len(path_parts) < 3:
-            raise ValueError("Pretrained directory structure should be 'trained_models/{surface}/{dynamics}/...'")
+        # Normalize path and split
+        abs_path = os.path.abspath(pretrained_dir)
+        path_parts = abs_path.split(os.sep)
 
-        surface_name = path_parts[-3]
-        dynamics_name = path_parts[-2]
+        try:
+            tm_index = path_parts.index("trained_models")
+            surface_name = path_parts[tm_index + 1]
+            dynamics_name = path_parts[tm_index + 2]
+        except (ValueError, IndexError):
+            raise ValueError("Path must contain 'trained_models/{surface}/{dynamics}/...'")
 
-        # Load the configuration file
+        # Load config
         config_path = os.path.join(pretrained_dir, "config.json")
         with open(config_path, "r") as f:
             params = json.load(f)
 
-        # Dynamically instantiate the correct ToyData object
         toy_data = cls._instantiate_toy_data(surface_name, dynamics_name, params, large_dim)
-
-        # Initialize the trainer
         trainer = cls(toy_data, params, device)
-        trainer.exp_dir = pretrained_dir  # Override experiment directory
-
-        # Load model weights
+        trainer.exp_dir = pretrained_dir
         trainer._load_model_weights(pretrained_dir)
 
         print(f"Successfully loaded model from {pretrained_dir}")
