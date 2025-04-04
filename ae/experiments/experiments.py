@@ -18,7 +18,7 @@ device = "cpu"
 time_horizons = [1.]
 
 # Load the pre-trained model: note working directory is currently ae/experiments
-model_dir = "trained_models/ProductSurface/RiemannianBrownianMotion/trained_20250403-171849_h[32]_df[8]_dr[8]_lr0.001_epochs9000_annealed_2nd"
+model_dir = "trained_models/ProductSurface/RiemannianBrownianMotion/trained_20250403-172958_h[32]_df[16]_dr[16]_lr0.001_epochs9000_annealed_2nd"
 trainer = Trainer.load_from_pretrained(model_dir, large_dim=large_dim)
 
 # Run geometry error once

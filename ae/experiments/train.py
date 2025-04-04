@@ -36,13 +36,13 @@ if __name__ == "__main__":
     # The intrinsic and extrinsic dimensions.
     extrinsic_dim, intrinsic_dim = 3, 2
     hidden_dims = [32]
-    diffusion_layers = [8]
-    drift_layers = [8]
+    diffusion_layers = [16]
+    drift_layers = [16]
     lr = 0.001
     weight_decay = 0.001
     epochs_ae = 9000
-    epochs_diffusion = 5000
-    epochs_drift = 5000
+    epochs_diffusion = 9000
+    epochs_drift = 9000
     print_freq = 1000
     # Diffeo weight for accumulative orders
     diffeo_weight_12 = 0.14 # this is the separate diffeo_weight for just the First order and second order
