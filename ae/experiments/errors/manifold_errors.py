@@ -27,9 +27,9 @@ class GeometryError:
         self.show = show
         self.embed = embed
 
-    def generate_test_data(self, epsilon=1., n=1000, test_seed=None, device="cpu"):
+    def generate_test_data(self, epsilon=1., n=1000, test_seed=None):
         self.toydata.set_point_cloud(epsilon, True)
-        return self.toydata.generate_data(n, 2, test_seed, device, embed=self.embed)
+        return self.toydata.generate_data(n, 2, test_seed, self.device, embed=self.embed)
 
     def compute_ambient_diff_and_drift(self,
                                        drift_model: AmbientDriftNetwork,
@@ -58,7 +58,8 @@ class GeometryError:
     # Helper: determine which test samples are in the interior (training domain)
     # -------------------------------------
     def is_interior_local(self, local_coords: torch.Tensor, bounds_list):
-        interior_mask = torch.ones(local_coords.shape[0], dtype=torch.bool, device=local_coords.device)
+        # interior_mask = torch.ones(local_coords.shape[0], dtype=torch.bool, device=local_coords.device)
+        interior_mask = torch.ones(local_coords.shape[0], dtype=torch.bool, device=self.device)
         for i, (low, high) in enumerate(bounds_list):
             interior_mask = interior_mask & (local_coords[:, i] >= low) & (local_coords[:, i] <= high)
         interior_mask = torch.tensor(interior_mask.detach().numpy(), dtype=torch.bool)
@@ -83,8 +84,8 @@ class GeometryError:
                                                                                         x_bnd, cov_bnd, mu_bnd)
             return losses_subset, drift_loss, diffusion_loss, ambient_drift_loss, ambient_diff_loss
 
-    def compute_and_plot_errors(self, eps_grid_size, num_test, test_seed, device, local_space=False):
-        test_dict = self.generate_test_data(self.eps_max, num_test, test_seed, device)
+    def compute_and_plot_errors(self, eps_grid_size, num_test, test_seed, local_space=False):
+        test_dict = self.generate_test_data(self.eps_max, num_test, test_seed)
         x_test_full = test_dict["x"]
         mu_test_full = test_dict["mu"]
         cov_test_full = test_dict["cov"]
@@ -195,7 +196,7 @@ class GeometryError:
 
     def plot_int_bd_surface(self, epsilon=0.5):
         for name, model in self.trainer.models.items():
-            fig = plot_interior_boundary_highlight(epsilon, self.toydata, model, name)
+            fig = plot_interior_boundary_highlight(epsilon, self.toydata, model, name, self.device)
             save_plot(fig, self.trainer.exp_dir, plot_name="interior_boundary_highlight_gt_pts")
-            fig = plot_interior_boundary_recon(epsilon, self.toydata, model, name)
+            fig = plot_interior_boundary_recon(epsilon, self.toydata, model, name, self.device)
             save_plot(fig, self.trainer.exp_dir, plot_name="interior_boundary_highlight_recon_pts")
