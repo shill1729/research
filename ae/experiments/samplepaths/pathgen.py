@@ -51,7 +51,7 @@ class SamplePathGenerator:
         :param name:
         :return:
         """
-        print("trainer object's device = "+self.trainer.device)
+        print("trainer object's device = "+str(self.trainer.device))
         model.to(self.trainer.device)
         z0_tensor = model.autoencoder.encoder(x0_torch)
         x0_hat = model.autoencoder.decoder(z0_tensor).cpu().detach().numpy().squeeze(0)

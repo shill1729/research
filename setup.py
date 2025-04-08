@@ -8,7 +8,7 @@ def parse_requirements(filename):
 
 setup(
     name='ae',
-    version='0.1.24',
+    version='0.1.25',
     packages=find_packages(include=["ae", "ae.*"]),
     exclude_package_data={"examples": ["examples/*"], "flows": ["flows/*"]},
     url='https://github.com/shill1729/research',
