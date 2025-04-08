@@ -75,7 +75,7 @@ def plot_interior_boundary_recon(epsilon, toydata: ToyData, aedf: AutoEncoderDif
 
     x = data[0]         # Embedded 3D points on the learned surface
     model_local_x = aedf.autoencoder.encoder.forward(torch.tensor(x, dtype=torch.float32, device=device))
-    model_x = aedf.autoencoder.decoder.forward(model_local_x).detach().numpy()
+    model_x = aedf.autoencoder.decoder.forward(model_local_x).cpu().detach().numpy()
     local_x = data[4] # True local x
 
     # Check which local_x are in the interior box [a, b]^2
