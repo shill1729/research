@@ -31,6 +31,7 @@ def fit_model(model: nn.Module,
     :param print_freq: print frequency of loss
     :param weight_decay: weight decay
     :param batch_size: batch size for training
+    :param anneal_weights:
     :return:
     """
     optimizer = torch.optim.AdamW(params=model.parameters(), lr=lr, weight_decay=weight_decay)

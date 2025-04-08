@@ -99,11 +99,11 @@ class Trainer:
         x = data["x"]
         # z = self.models["vanilla"].autoencoder.encoder(x).detach()
         print("Training Ambient drift:")
-        fit_model(self.ambient_drift, AmbientDriftLoss(), x, data["mu"], self.params["lr"],
+        fit_model(self.ambient_drift.to(self.device), AmbientDriftLoss().to(self.device), x, data["mu"], self.params["lr"],
                   self.params["epochs_drift"],
                   self.params["print_freq"], self.params["weight_decay"], self.params["batch_size"])
         print("Training Ambient diffusion/covariance:")
-        fit_model(self.ambient_diffusion, AmbientDiffusionLoss(), x, data["cov"], self.params["lr"],
+        fit_model(self.ambient_diffusion.to(self.device), AmbientDiffusionLoss().to(self.device), x, data["cov"], self.params["lr"],
                   self.params["epochs_drift"],
                   self.params["print_freq"], self.params["weight_decay"], self.params["batch_size"])
 
