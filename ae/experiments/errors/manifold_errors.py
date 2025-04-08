@@ -58,8 +58,8 @@ class GeometryError:
     # Helper: determine which test samples are in the interior (training domain)
     # -------------------------------------
     def is_interior_local(self, local_coords: torch.Tensor, bounds_list):
-        # interior_mask = torch.ones(local_coords.shape[0], dtype=torch.bool, device=local_coords.device)
-        interior_mask = torch.ones(local_coords.shape[0], dtype=torch.bool, device=self.device)
+        interior_mask = torch.ones(local_coords.shape[0], dtype=torch.bool, device=local_coords.device)
+        # interior_mask = torch.ones(local_coords.shape[0], dtype=torch.bool, device=self.device)
         for i, (low, high) in enumerate(bounds_list):
             interior_mask = interior_mask & (local_coords[:, i] >= low) & (local_coords[:, i] <= high)
         interior_mask = torch.tensor(interior_mask.detach().numpy(), dtype=torch.bool)
