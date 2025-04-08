@@ -13,8 +13,12 @@ from ae.toydata.surfaces import *
 #     according to whether the local coordinates (x,y) is in the training region [a,b]^2 or not.
 #     (The testing data is generated in [a-\epsilon, b+\epsilon]^2) for a sufficiently large $\epsilon$.
 #     b. Do this for each AE-model and plot the model's surface along the point cloud.
+#
+# TODO 4/7/2025:
+#  1. Print out reconstruction loss on interior, as well as the ambient drift and diffusion MSE.
+#  2. Make sure when you pass the device it goes through every object.
 
-device = torch.device("cpu")
+device = torch.device("mps")
 train_seed = None
 test_seed = None
 embedding_seed = 17
@@ -22,16 +26,18 @@ norm = "fro"
 eps_max = 0.5
 # Set large dim = 5,10, 100 for embedding into higher dimension. Note this is imported into 'inference.py'! So make
 # sure it lines up.
+# TODO: currently does not work for the boundary initial point of the sample paths. So it is broken for now.
 large_dim = None
 embed = False # Bool for embedding or not
+
 
 if __name__ == "__main__":
 
     # torch.manual_seed(train_seed)
     # Point cloud parameters
-    num_points = 30
+    num_points = 100
     num_test = 20000
-    batch_size = 20
+    batch_size = int(num_points/2)
 
     eps_grid_size = 10
     # The intrinsic and extrinsic dimensions.
@@ -40,7 +46,7 @@ if __name__ == "__main__":
     diffusion_layers = [2]
     drift_layers = [2]
     lr = 0.001
-    weight_decay = 0.01
+    weight_decay = 0.001
     epochs_ae = 2
     epochs_diffusion = 2
     epochs_drift = 2

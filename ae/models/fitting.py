@@ -3,9 +3,10 @@ from typing import Union, List, Tuple, Optional
 import torch
 from torch import nn, Tensor
 from torch.utils.data import DataLoader, TensorDataset
-
+from ae.models import AutoEncoderDiffusion
 from ae.models.losses import TotalLoss, LocalDiffusionLoss, LocalDriftLoss, LossWeights
 from ae.utils import set_grad_tracking
+
 
 
 def fit_model(model: nn.Module,
@@ -87,10 +88,11 @@ class ThreeStageFit:
         self.batch_size = batch_size
         self.print_freq = print_freq
 
-    def three_stage_fit(self, ae_diffusion, weights: LossWeights, x, mu, cov, p, orthonormal_frame, anneal_weights=None, norm="fro", device="cpu"):
+    def three_stage_fit(self, ae_diffusion: AutoEncoderDiffusion, weights: LossWeights, x, mu, cov, p, orthonormal_frame, anneal_weights=None, norm="fro", device="cpu"):
         ae_loss = TotalLoss(weights, norm, device)
-        diffusion_loss = LocalDiffusionLoss(norm)
-        drift_loss = LocalDriftLoss()
+        ae_diffusion.to(device)
+        diffusion_loss = LocalDiffusionLoss(norm).to(device)
+        drift_loss = LocalDriftLoss().to(device)
 
         # Train the AE.
         set_grad_tracking(ae_diffusion.autoencoder, True)

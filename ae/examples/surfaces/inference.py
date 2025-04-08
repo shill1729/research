@@ -4,28 +4,29 @@ from ae.experiments.samplepaths.path_computations import compute_increments
 from ae.experiments.training.helpers import get_time_horizon_name, print_dict
 from train import large_dim, embed, embedding_seed, eps_max
 import numpy as np
-
+# TODO: Refactor this to save the mean's of the ensembles of functionals.
+#  That way we can store means
 # Settings that remain constant
 show_geo = True
 show_stats = True
 eps_grid_size = 10
 num_test = 20000
-h = 0.01
-n_paths = 5
-device = "cpu"
+h = 0.0005
+n_paths = 100
+device = "mps"
 # Define a list of time horizons to test
-time_horizons = [0.05]
+time_horizons = [0.5]
 
 # Load the pre-trained model: note working directory is currently ae/experiments
-model_dir = "../examples/surfaces/trained_models/Paraboloid/RiemannianBrownianMotion/trained_20250404-150233_h[2]_df[2]_dr[2]_lr0.001_epochs2_not_annealed"
+model_dir = "examples/surfaces/trained_models/ProductSurface/AnisotropicSDE2/trained_20250407-143553_h[64, 64]_df[64, 64]_dr[64, 64]_lr0.001_epochs10000_not_annealed"
 trainer = Trainer.load_from_pretrained(model_dir, large_dim=large_dim)
 
 # Run geometry error once
 print(trainer.toy_data.large_dim)
 trainer.toy_data.embedding_seed = embedding_seed
 geometry = GeometryError(trainer.toy_data, trainer, eps_max, device, show=show_geo, embed=embed)
-# geometry.compute_and_plot_errors(eps_grid_size, num_test, None, device)
-# geometry.plot_int_bd_surface(epsilon=eps_max)
+geometry.compute_and_plot_errors(eps_grid_size, num_test, None, device)
+geometry.plot_int_bd_surface(epsilon=eps_max)
 
 # Loop over each time horizon and run dynamics error analysis
 for tn in time_horizons:

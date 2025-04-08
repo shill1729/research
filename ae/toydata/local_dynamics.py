@@ -224,20 +224,20 @@ class AnisotropicSDE2(DynamicsBase):
 
         # Define anisotropic drift a = (a^1, a^2)
         a = sp.Matrix([
-            -2 * u + v,  # Example: Swirling motion or gradient flow
-            -2 * v
+            -0.2 * sp.cos(u+v)*u*v,
+            -0.5 * sp.sin(v**2)
         ])
 
-        return a / 10.
+        return a
 
     def diffusion(self, manifold: RiemannianManifold):
         u, v = self.u, self.v
 
         # Define anisotropic diffusion coefficient b (not necessarily isotropic)
         b = sp.Matrix([
-            [1, 0],  # Stronger diffusion along u
+            [sp.exp(-v), 0],  # Stronger diffusion along u
             [0, sp.exp(u)]  # Exponential growth in v-direction
         ])
 
-        return b / 10.
+        return b / 2.
 
