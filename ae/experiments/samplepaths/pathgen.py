@@ -140,7 +140,7 @@ class SamplePathGenerator:
         # x0 = self.toydata.point_cloud.np_phi(*[0.8, 0.8]).squeeze(1)
         # print("Point near the boundary")
         # print(x0)
-        x0_torch = torch.tensor(x0, dtype=torch.float32).unsqueeze(0)  # torch (1,D)
+        x0_torch = torch.tensor(x0, dtype=torch.float32, device=self.trainer.device).unsqueeze(0)  # torch (1,D)
         z0_dict = {name: self.__get_z0(model, x0_torch, name) for name, model in self.trainer.models.items()}
         ambient_gt, local_gt = self.toydata.ground_truth_ensemble(x0, tn, ntime, npaths)
         # Embed ground-truth ambient paths if testing in D >> 3
