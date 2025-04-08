@@ -67,16 +67,16 @@ class SamplePathPlotter:
 
         self._plot_paths(ax, gt, colors["Ground Truth"], is_3d=is_3d)
         if is_3d:
-            self._plot_paths(ax, vanilla_ambient_paths, colors["Ambient Model"], is_3d=is_3d)
+            self._plot_paths(ax, vanilla_ambient_paths.cpu(), colors["Ambient Model"], is_3d=is_3d)
 
         for name, paths in ae_paths_dict.items():
-            self._plot_paths(ax, paths, colors[name], is_3d=is_3d)
+            self._plot_paths(ax, paths.cpu().detach(), colors[name], is_3d=is_3d)
 
         self._finalize_plot(fig, ax, colors, plot_name)
 
     def plot_kernel_density(self, gt_ensemble, model_ensembles, ambient_ensemble=None, terminal=True):
         """Generalized KDE plot for terminal or initial distributions."""
-        kl_dict = compute_kl_divergences(gt_ensemble, model_ensembles, ambient_ensemble, terminal, self.save_folder)
+        kl_dict = compute_kl_divergences(gt_ensemble, model_ensembles, ambient_ensemble.cpu(), terminal, self.save_folder)
         npaths, ntime_plus_1, d = gt_ensemble.shape
         time_type = "terminal" if terminal else "1st-step"
         terminal_idx = -1 if terminal else 1
@@ -126,7 +126,7 @@ class SamplePathPlotter:
             ax1 = fig.add_subplot(1, 2, 1)
             gt = model_data["Ground Truth"]
             for model_name, values in model_data.items():
-                ax1.plot(time_grid, values, label=model_name, color=colors[model_name])
+                ax1.plot(time_grid, values.cpu().detach(), label=model_name, color=colors[model_name])
             ax1.set_xlabel("Time")
             ax1.set_ylabel(f"E[{fname}(X_t) | X_0]")
             ax1.set_title(f"{fname}")
@@ -137,7 +137,7 @@ class SamplePathPlotter:
             ax2 = fig.add_subplot(1, 2, 2)
             for model_name, values in model_data.items():
                 if model_name != "Ground Truth":  # Skip ground truth in error plot
-                    ax2.plot(time_grid, (np.array(values) - np.array(gt)) ** 2, label=model_name, color=colors[model_name])
+                    ax2.plot(time_grid, (np.array(values.cpu().detach()) - np.array(gt.cpu().detach())) ** 2, label=model_name, color=colors[model_name])
             ax2.set_xlabel("Time")
             ax2.set_ylabel("MSE")
             ax2.set_title(f"Error of {fname}")
@@ -204,13 +204,13 @@ class SamplePathPlotter:
         # Combine all means
         model_means = {"Ground Truth": mean_gt_path, **mean_ae_paths, "Ambient Model": mean_ambient_path}
         # Compute ground truth norm for relative errors
-        mean_gt_norm = np.linalg.vector_norm(mean_gt_path, axis=1, ord=2, keepdims=False)
+        mean_gt_norm = np.linalg.vector_norm(mean_gt_path.cpu().detach().numpy(), axis=1, ord=2, keepdims=False)
         fig, ax = plt.subplots(figsize=(10, 6))
         colors = self._get_model_colors()
         # Plot errors for each model
         for model_name, mean_path in model_means.items():
             if model_name != "Ground Truth":  # Skip ground truth
-                abs_errors = np.linalg.vector_norm(mean_gt_path - mean_path, axis=1, ord=2, keepdims=False)
+                abs_errors = np.linalg.vector_norm(mean_gt_path.cpu().detach().numpy() - mean_path.cpu().detach().numpy(), axis=1, ord=2, keepdims=False)
                 if relative:
                     errors = abs_errors / mean_gt_norm
                     label = f"{model_name} (Relative)"
@@ -247,8 +247,8 @@ class SamplePathPlotter:
         fig, ax = plt.subplots(figsize=(10, 6))
         colors = self._get_model_colors()
         # Compute mean Euclidean deviation over ensembles for each time step
-        deviation_ambient = np.linalg.vector_norm(paths_ground_truth - paths_ambient, ord=2, axis=2)
-        deviation_ae = {name: np.linalg.vector_norm(paths_ground_truth - paths, ord=2, axis=2)
+        deviation_ambient = np.linalg.vector_norm(paths_ground_truth - paths_ambient.cpu().detach().numpy(), ord=2, axis=2)
+        deviation_ae = {name: np.linalg.vector_norm(paths_ground_truth - paths.cpu().detach().numpy(), ord=2, axis=2)
                              for name, paths in paths_ae.items()}
 
         model_deviation_means = {
@@ -288,8 +288,8 @@ class SamplePathPlotter:
         fig, ax = plt.subplots(figsize=(10, 6))
         colors = self._get_model_colors()
         # Compute variance of Euclidean deviation over ensembles for each time step
-        deviation_ambient = np.linalg.vector_norm(paths_ground_truth - paths_ambient, ord=2, axis=2)
-        deviation_ae = {name: np.linalg.vector_norm(paths_ground_truth - paths, ord=2, axis=2)
+        deviation_ambient = np.linalg.vector_norm(paths_ground_truth - paths_ambient.cpu().detach().numpy(), ord=2, axis=2)
+        deviation_ae = {name: np.linalg.vector_norm(paths_ground_truth - paths.cpu().detach().numpy(), ord=2, axis=2)
                         for name, paths in paths_ae.items()}
 
         model_deviation_variances = {
@@ -342,7 +342,7 @@ class SamplePathPlotter:
         # Plot errors for each model
         for model_name, cov_path in model_covariances.items():
             if model_name != "Ground Truth":  # Skip ground truth
-                absolute_errors = np.linalg.matrix_norm(cov_gt - cov_path, ord=norm)
+                absolute_errors = np.linalg.matrix_norm(cov_gt - cov_path.detach(), ord=norm)
 
                 if relative:
                     errors = absolute_errors / cov_gt_norm

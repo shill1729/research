@@ -12,23 +12,25 @@ show_geo = True
 show_stats = True
 eps_grid_size = 10
 num_test = 20000
-h = 0.0005
-n_paths = 100
+h = 0.01
+n_paths = 5
 # Define a list of time horizons to test
 time_horizons = [0.5]
 
 # Load the pre-trained model: note working directory is currently ae/experiments
 model_dir = "examples/surfaces/trained_models/ProductSurface/AnisotropicSDE2/trained_20250407-143553_h[64, 64]_df[64, 64]_dr[64, 64]_lr0.001_epochs10000_not_annealed"
-trainer = Trainer.load_from_pretrained(model_dir, large_dim=large_dim)
+trainer = Trainer.load_from_pretrained(model_dir, device=device, large_dim=large_dim)
 trainer.models = {name:model.to(device) for name, model in trainer.models.items()}
 trainer.ambient_drift.to(device)
 trainer.ambient_diffusion.to(device)
+trainer.device = device
+
 # Run geometry error once
 print(trainer.toy_data.large_dim)
 trainer.toy_data.embedding_seed = embedding_seed
 geometry = GeometryError(trainer.toy_data, trainer, eps_max, device, show=show_geo, embed=embed)
-geometry.compute_and_plot_errors(eps_grid_size, num_test, None)
-geometry.plot_int_bd_surface(epsilon=eps_max)
+# geometry.compute_and_plot_errors(eps_grid_size, num_test, None)
+# geometry.plot_int_bd_surface(epsilon=eps_max)
 
 # Loop over each time horizon and run dynamics error analysis
 for tn in time_horizons:
@@ -50,8 +52,8 @@ for tn in time_horizons:
     dynamics_error.sample_path_plotter.plot_sample_paths(gt, aes, at, True, "ambient")
 
     # Plot kernel density estimates for both first-step and terminal transition
-    kl_1step = dynamics_error.sample_path_plotter.plot_kernel_density(gt, aes, at, False)
-    kl_term = dynamics_error.sample_path_plotter.plot_kernel_density(gt, aes, at, True)
+    # kl_1step = dynamics_error.sample_path_plotter.plot_kernel_density(gt, aes, at, False)
+    # kl_term = dynamics_error.sample_path_plotter.plot_kernel_density(gt, aes, at, True)
 
     if n_paths < 1000:
         # Plot local sample paths
@@ -67,10 +69,10 @@ for tn in time_horizons:
     dynamics_error.sample_path_plotter.plot_deviation_of_means(results2, plot_name="increment")
     dynamics_error.sample_path_plotter.plot_covariance_errors(results2, plot_name="increment")
 
-    print("1st step PDF")
-    print_dict(kl_1step)
-    print("\nTerminal PDF")
-    print_dict(kl_term)
+    # print("1st step PDF")
+    # print_dict(kl_1step)
+    # print("\nTerminal PDF")
+    # print_dict(kl_term)
 
 # from ae.experiments.manifold_errors import GeometryError
 # from ae.experiments.sde_errors import DynamicsError

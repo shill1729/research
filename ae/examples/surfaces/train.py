@@ -18,7 +18,7 @@ from ae.toydata.surfaces import *
 #  1. Print out reconstruction loss on interior, as well as the ambient drift and diffusion MSE.
 #  2. Make sure when you pass the device it goes through every object.
 
-device = torch.device("mps")
+device = torch.device("cpu")
 train_seed = None
 test_seed = None
 embedding_seed = 17

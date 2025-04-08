@@ -1,6 +1,7 @@
 """
     Collection of functions for computing statistics of sample paths over time.
 """
+import torch
 import numpy as np
 import pandas as pd
 from scipy.stats import gaussian_kde
@@ -18,13 +19,13 @@ def apply_function(gt, amb, aes: dict, func):
     :param func:
     :return:
     """
-    gt_func = func(gt)
+    gt_func = func(torch.tensor(gt, dtype=torch.float32, device=amb.device))
     amb_func = func(amb)
     aes_func = {name: func(ensemble) for name, ensemble in aes.items()}
     return gt_func, amb_func, aes_func
 
 
-def compute_covariance_sample_path(paths):
+def compute_covariance_sample_path(paths: torch.Tensor):
     """
     Compute the covariance matrix for each time step across the ensemble
 
@@ -34,10 +35,10 @@ def compute_covariance_sample_path(paths):
     Returns:
         numpy.ndarray: Covariance matrices of shape (n_time, n_dim, n_dim)
     """
-    n_time, n_dim = paths.shape[1], paths.shape[2]
-    covariances = np.zeros((n_time, n_dim, n_dim))
+    n_time, n_dim = paths.size()[1], paths.size()[2]
+    covariances = torch.zeros((n_time, n_dim, n_dim))
     for t in range(n_time):
-        covariances[t] = np.cov(paths[:, t, :], rowvar=False, bias=True)  # bias=True for MLE-like normalization
+        covariances[t] = torch.cov(paths[:, t, :].mT)  # bias=True for MLE-like normalization
     return covariances
 
 
@@ -49,7 +50,7 @@ def compute_increments(gt, amb, aes: dict):
     :param aes: dict of {names: (npaths, ntime+1, D), ...}
     :return:
     """
-    return apply_function(gt, amb, aes, lambda x: np.diff(x, axis=1))
+    return apply_function(gt, amb, aes, lambda x: torch.diff(x, dim=1))
 
 
 def compute_norms(gt, amb, aes: dict):
@@ -60,7 +61,7 @@ def compute_norms(gt, amb, aes: dict):
     :param aes: dict of {names: (npaths, ntime+1, D), ...}
     :return:
     """
-    return apply_function(gt, amb, aes, lambda x: np.linalg.vector_norm(x, axis=2, ord=2))
+    return apply_function(gt, amb, aes, lambda x: torch.linalg.vector_norm(x, dim=2, ord=2))
 
 
 def compute_mean_sample_paths(gt, amb, aes: dict):
@@ -71,7 +72,7 @@ def compute_mean_sample_paths(gt, amb, aes: dict):
     :param aes: dict of {names: (npaths, ntime+1, D), ...}
     :return:
     """
-    return apply_function(gt, amb, aes, lambda x: np.mean(x, axis=0))
+    return apply_function(gt, amb, aes, lambda x: torch.mean(x, dim=0))
 
 
 def compute_variance_sample_paths(gt, amb, aes: dict):
@@ -82,7 +83,7 @@ def compute_variance_sample_paths(gt, amb, aes: dict):
     :param aes: dict of {names: (npaths, ntime+1, D), ...}
     :return:
     """
-    return apply_function(gt, amb, aes, lambda x: np.var(x, axis=0))
+    return apply_function(gt, amb, aes, lambda x: torch.var(x, dim=0))
 
 
 def compute_covariance_sample_paths(gt, amb, aes: dict):
@@ -144,7 +145,7 @@ def compute_kl_divergences(gt_ensemble, model_ensembles, ambient_ensemble=None, 
             model_kl_values["Ambient Model"] = kl_ambient
 
         for model_name, model in model_ensembles.items():
-            model_kde = gaussian_kde(model[:, terminal_idx, i])
+            model_kde = gaussian_kde(model[:, terminal_idx, i].cpu().detach())
             kl_model = kl_divergence(gt_kde, model_kde, x_range)
             model_kl_values[model_name] = kl_model
 

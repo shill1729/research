@@ -20,7 +20,7 @@ from ae.toydata.local_dynamics import DynamicsBase
 class Trainer:
     def __init__(self, toy_data: ToyData, params: dict, device="cpu", anneal_tag="not_annealed", embed=False):
         self.toy_data = toy_data
-        self.device = torch.device(device)
+        self.device = device
         self.params = params
         self.anneal_tag = anneal_tag
         self.exp_dir = None
@@ -55,8 +55,8 @@ class Trainer:
                                          activation)
             self.models[model_type] = AutoEncoderDiffusion(latent_sde, ae)
 
-        self.ambient_drift = AmbientDriftNetwork(extrinsic_dim, extrinsic_dim, drift_layers, activation)
-        self.ambient_diffusion = AmbientDiffusionNetwork(extrinsic_dim, extrinsic_dim, diffusion_layers, activation)
+        self.ambient_drift = AmbientDriftNetwork(extrinsic_dim, extrinsic_dim, drift_layers, activation, device=self.device)
+        self.ambient_diffusion = AmbientDiffusionNetwork(extrinsic_dim, extrinsic_dim, diffusion_layers, activation, device=self.device)
         weights_vanilla = LossWeights()
         weights_first_order = LossWeights(diffeomorphism_reg=self.params["diffeo_weight"],
                                           tangent_angle_weight=self.params["tangent_angle_weight"])

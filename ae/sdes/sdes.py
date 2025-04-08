@@ -4,7 +4,7 @@
 from scipy.integrate import trapezoid
 import matplotlib.pyplot as plt
 import numpy as np
-
+import torch
 
 def plot_sample_path(t, x, ax: plt.Axes) -> None:
     """
@@ -329,6 +329,82 @@ class SDE:
         ax4.set_title("t=" + str(tn))
         # Finally, show everything!
         plt.show()
+
+
+
+class SDEtorch:
+    def __init__(self, mu, sigma):
+        """
+        A PyTorch-compatible SDE simulator.
+
+        :param mu: function of (t, x) returning tensor of shape (d,)
+        :param sigma: function of (t, x) returning tensor of shape (d, n)
+        """
+        self.mu = mu
+        self.sigma = sigma
+
+    def solve(self, x0, tn, ntime=100, t0=0.0, seed=None, noise_dim=None, device=None, dtype=torch.float32):
+        """
+        Euler-Maruyama integrator for the SDE.
+
+        :param x0: initial state (1D tensor of shape (d,))
+        :param tn: terminal time
+        :param ntime: number of time steps
+        :param t0: initial time
+        :param seed: RNG seed for reproducibility
+        :param noise_dim: dimension of Brownian noise (if None, use state dim)
+        :param device: torch device
+        :param dtype: torch dtype
+        :return: tensor of shape (ntime+1, d)
+        """
+        device = device or x0.device
+        x0 = x0.to(dtype=dtype, device=device)
+        if x0.ndim == 0:
+            x0 = x0.unsqueeze(0)
+        d = x0.shape[0]
+        noise_dim = noise_dim or d
+
+        h = (tn - t0) / ntime
+        x = torch.zeros((ntime + 1, d), dtype=dtype, device=device)
+        x[0] = x0
+
+        if seed is not None:
+            gen = torch.Generator(device=device).manual_seed(seed)
+        else:
+            gen = torch.Generator(device=device)
+
+
+        for i in range(ntime):
+            t_i = t0 + i * h
+            drift = self.mu(t_i, x[i])
+            diffusion = self.sigma(t_i, x[i])  # shape (d, noise_dim)
+            dB = torch.randn((noise_dim, 1), generator=gen, dtype=dtype, device=device) * torch.sqrt(torch.tensor(h, dtype=dtype, device=device))
+            x[i + 1] = x[i] + drift * h + torch.matmul(diffusion, dB).squeeze()
+        return x
+
+    def sample_ensemble(self, x0, tn, ntime=100, npaths=5, t0=0.0, noise_dim=None, device=None, dtype=torch.float32):
+        """
+        Generate an ensemble of sample paths.
+
+        :param x0: initial state (1D tensor of shape (d,))
+        :param tn: terminal time
+        :param ntime: number of time steps
+        :param npaths: number of sample paths
+        :param t0: initial time
+        :param noise_dim: dimension of Brownian noise
+        :param device: torch device
+        :param dtype: torch dtype
+        :return: tensor of shape (npaths, ntime+1, d)
+        """
+        x0 = x0.to(dtype=dtype, device=device or x0.device)
+        if x0.ndim == 0:
+            x0 = x0.unsqueeze(0)
+        d = x0.shape[0]
+        paths = torch.zeros((npaths, ntime + 1, d), dtype=dtype, device=device or x0.device)
+        for i in range(npaths):
+            paths[i] = self.solve(x0, tn, ntime, t0, seed=None, noise_dim=noise_dim, device=device, dtype=dtype)
+        return paths
+
 
 
 if __name__ == "__main__":

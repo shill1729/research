@@ -8,6 +8,7 @@ from ae.experiments.samplepaths import (feynman_kac_formula, compute_mean_sample
                                                           compute_norms, apply_function)
 from ae.experiments.training.helpers import get_time_horizon_name
 import numpy as np
+import torch
 
 
 class DynamicsError:
@@ -58,7 +59,7 @@ class DynamicsError:
         Vectorized version of chart_error for ensemble paths
 
         Args:
-            paths (numpy.ndarray): Ensemble paths of shape (n_ensemble, n_time, n_dim)
+            paths (torch.tensor): Ensemble paths of shape (n_ensemble, n_time, n_dim)
 
         Returns:
             numpy.ndarray: Error values of shape (n_ensemble, n_time)
@@ -74,10 +75,10 @@ class DynamicsError:
         # Compute errors for each point in the ensemble
         for i in range(n_ensemble):
             for t in range(n_time):
-                expected_z = self.toydata.point_cloud.np_phi(x_coords[i, t], y_coords[i, t])[2]
-                errors[i, t] = np.abs(expected_z - z_coords[i, t])
+                expected_z = self.toydata.point_cloud.np_phi(x_coords[i, t].cpu().detach(), y_coords[i, t].cpu().detach())[2]
+                errors[i, t] = np.abs(expected_z - z_coords[i, t].cpu().detach().numpy())
 
-        return errors
+        return torch.tensor(errors, dtype=torch.float32, device=paths.device)
 
     def get_standard_test_functions(self):
         """
@@ -87,10 +88,10 @@ class DynamicsError:
             list: List of (function name, vectorized function) tuples
         """
         return [
-            ("l2 norm", lambda paths: np.linalg.vector_norm(paths, axis=2, ord=2)),
-            ("polynomial", lambda paths: np.tanh(paths[:, :, 2]**2-paths[:, :, 1]*paths[:, :, 0])),
-            ("cosine-poly", lambda paths: np.cos(paths[:, :, 2]**2-paths[:, :, 1]**3)*paths[:, :, 0]),
-            ("sin(x1)x3", lambda paths: np.sin(4*paths[:, :, 1])*paths[:, :, 2]),
+            ("l2 norm", lambda paths: torch.linalg.vector_norm(paths, axis=2, ord=2)),
+            ("polynomial", lambda paths: torch.tanh(paths[:, :, 2]**2-paths[:, :, 1]*paths[:, :, 0])),
+            ("cosine-poly", lambda paths: torch.cos(paths[:, :, 2]**2-paths[:, :, 1]**3)*paths[:, :, 0]),
+            ("sin(x1)x3", lambda paths: torch.sin(4*paths[:, :, 1])*paths[:, :, 2]),
             ("rational function", lambda paths: paths[:, :, 2]/(1+paths[:, :, 1]**2+paths[:, :, 0]**2)),
             ("Manifold constraint", self.chart_error_vectorized),
             ("x1", lambda paths: paths[:, :, 0]),
@@ -144,10 +145,9 @@ class DynamicsError:
 
             # Calculate means over ensemble dimension (axis=0)
             f_gt_means, f_amb_means, f_ae_means = compute_mean_sample_paths(gt_values, amb_values, ae_values)
-
             # Calculate standard errors of the mean (SEM)
             gt_sem, amb_sem, ae_sem = apply_function(gt_values, amb_values, ae_values,
-                                                     lambda x: np.std(x, axis=0)/np.sqrt(n))
+                                                     lambda x: torch.std(x, dim=0)/np.sqrt(n))
 
             # Store results
             standard_test_results[fname] = {

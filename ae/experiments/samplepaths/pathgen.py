@@ -7,7 +7,7 @@ import numpy as np
 from ae.toydata.datagen import ToyData
 from ae.experiments.training.training import Trainer
 from ae.models.local_neural_sdes import AutoEncoderDiffusion
-from ae.sdes import SDE
+from ae.sdes import SDE, SDEtorch
 from ae.utils import random_rotation_matrix, pad
 
 class SamplePathGenerator:
@@ -19,7 +19,9 @@ class SamplePathGenerator:
         """
         self.toydata = toydata
         self.trainer = trainer
-        self.ambient_sde = SDE(self.trainer.ambient_drift.drift_numpy, self.trainer.ambient_diffusion.diffusion_numpy)
+        # self.ambient_sde = SDE(self.trainer.ambient_drift.drift_numpy,
+    #                            self.trainer.ambient_diffusion.diffusion_numpy)
+        self.ambient_sde = SDEtorch(self.trainer.ambient_drift.drift_torch, self.trainer.ambient_diffusion.diffusion_torch)
         self.ground_truth_paths = None
         self.vanilla_ambient_paths = None
         self.ae_paths = None
@@ -57,11 +59,11 @@ class SamplePathGenerator:
         x0_hat = model.autoencoder.decoder(z0_tensor).cpu().detach().numpy().squeeze(0)
 
         x0_numpy = x0_torch.squeeze(0).cpu().detach().numpy()
-        z0_numpy = z0_tensor.detach().numpy().squeeze(0)
+        z0_numpy = z0_tensor.cpu().detach().numpy().squeeze(0)
         print("\n " + str(name))
         print("l1 Recon Error for x0 = " + str(np.linalg.vector_norm(x0_hat - x0_numpy, ord=1)))
         print("l2 Recon Error for x0 = " + str(np.linalg.vector_norm(x0_hat - x0_numpy, ord=2)))
-        return z0_numpy
+        return z0_tensor
 
     def get_best_point(self, num_samples=1000, seed=None, embed=False):
         """
@@ -151,8 +153,10 @@ class SamplePathGenerator:
             for i in range(npaths):
                 Q = random_rotation_matrix(D=large_dim, seed=self.toydata.embedding_seed)
                 embedded_gt[i] = pad(ambient_gt[i], large_dim) @ Q.T
-        vanilla_ambient_paths = self.ambient_sde.sample_ensemble(x0, tn, ntime, npaths, noise_dim=large_dim)
-        ae_paths = {name: self.__generate_paths_ae(z0_dict[name], model, tn, npaths, ntime) for name, model in self.trainer.models.items()}
+        print(x0_torch)
+        print(self.trainer.device)
+        vanilla_ambient_paths = self.ambient_sde.sample_ensemble(x0_torch[0], tn, ntime, npaths, noise_dim=large_dim, device=self.trainer.device)
+        ae_paths = {name: self.__generate_paths_ae(z0_dict[name][0], model, tn, npaths, ntime) for name, model in self.trainer.models.items()}
         ambient_ae_paths = {name: ae_paths[name][0] for name in self.trainer.models.keys()}
         local_ae_paths = {name: ae_paths[name][1] for name in self.trainer.models.keys()}
         if embed:

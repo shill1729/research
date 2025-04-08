@@ -12,9 +12,11 @@ class AmbientDriftNetwork(nn.Module):
                  output_dim: int,
                  hidden_dims: List[int],
                  drift_act: nn.Module,
+                 device = "cpu",
                  *args,
                  **kwargs):
         super().__init__(*args, **kwargs)
+        self.device = device
         self.input_dim = input_dim
         self.output_dim = output_dim
         # Drift architecture
@@ -26,8 +28,12 @@ class AmbientDriftNetwork(nn.Module):
         return self.drift.forward(z)
 
     def drift_numpy(self, t, z):
-        w = torch.tensor(z, dtype=torch.float32)
-        return self.drift.forward(w).detach().numpy()
+        w = torch.tensor(z, dtype=torch.float32, device=self.device)
+        return self.drift.forward(w).cpu().detach().numpy()
+
+    def drift_torch(self, t, z):
+        with torch.no_grad():
+            return self.drift.forward(z)
 
 
 class AmbientDiffusionNetwork(nn.Module):
@@ -36,9 +42,11 @@ class AmbientDiffusionNetwork(nn.Module):
                  output_dim: int,
                  hidden_dims: List[int],
                  diffusion_act: nn.Module,
+                 device="cpu",
                  *args,
                  **kwargs):
         super().__init__(*args, **kwargs)
+        self.device = device
         self.input_dim = input_dim
         self.output_dim = output_dim
         # Diffusion architecture
@@ -50,6 +58,11 @@ class AmbientDiffusionNetwork(nn.Module):
         return self.diffusion.forward(z).view((z.size(0), self.output_dim, self.output_dim))
 
     def diffusion_numpy(self, t, z):
-        w = torch.tensor(z, dtype=torch.float32)
+        w = torch.tensor(z, dtype=torch.float32, device=self.device)
         d = self.output_dim
-        return self.diffusion.forward(w).view((d, d)).detach().numpy()
+        return self.diffusion.forward(w).view((d, d)).cpu().detach().numpy()
+
+    def diffusion_torch(self, t, z):
+        d = self.output_dim
+        with torch.no_grad():
+            return self.diffusion.forward(z).view((d, d))

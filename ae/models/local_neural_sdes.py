@@ -6,7 +6,7 @@ from torch import Tensor
 
 from ae.models.ffnn import FeedForwardNeuralNet
 from ae.models.autoencoder import AutoEncoder
-from ae.sdes import SDE
+from ae.sdes import SDE, SDEtorch
 
 
 # The Second order term coming from Ito's applied to vector valued functions (by applying Ito's component wise)
@@ -56,13 +56,24 @@ class LatentNeuralSDE(nn.Module):
     def latent_drift_fit(self, t: float, z: np.ndarray) -> np.ndarray:
         """ For numpy EM SDE solvers"""
         with torch.no_grad():
-            return self.drift_net(torch.tensor(z, dtype=torch.float32)).detach().numpy()
+            return self.drift_net(torch.tensor(z, dtype=torch.float32)).cpu().detach().numpy()
+
+    def latent_drift_torch(self, t: float, z: torch.Tensor) -> torch.Tensor:
+        """ For numpy EM SDE solvers"""
+        with torch.no_grad():
+            return self.drift_net(z)
 
     def latent_diffusion_fit(self, t: float, z: np.ndarray) -> np.ndarray:
         """ For numpy EM SDE solvers"""
         d = z.shape[0]
         with torch.no_grad():
-            return self.diffusion_net(torch.tensor(z, dtype=torch.float32)).view((d, d)).detach().numpy()
+            return self.diffusion_net(torch.tensor(z, dtype=torch.float32)).view((d, d)).cpu().detach().numpy()
+
+    def latent_diffusion_torch(self, t: float, z: torch.Tensor) -> torch.Tensor:
+        """ For numpy EM SDE solvers"""
+        d = z.shape[0]
+        with torch.no_grad():
+            return self.diffusion_net(z).view((d, d))
 
     def sample_paths(self, z0: np.ndarray, tn: float, ntime: int, npaths: int) -> np.ndarray:
         """
@@ -74,7 +85,8 @@ class LatentNeuralSDE(nn.Module):
         :return:
         """
         # Initialize SDE object
-        latent_sde = SDE(self.latent_drift_fit, self.latent_diffusion_fit)
+        # latent_sde = SDE(self.latent_drift_fit, self.latent_diffusion_fit)
+        latent_sde = SDEtorch(self.latent_drift_torch, self.latent_diffusion_torch)
         # Generate sample ensemble
         latent_ensemble = latent_sde.sample_ensemble(z0, tn, ntime, npaths, noise_dim=self.intrinsic_dim)
         return latent_ensemble
@@ -106,9 +118,11 @@ class AutoEncoderDiffusion(nn.Module):
         self.intrinsic_dim = ae.intrinsic_dim
         self.extrinsic_dim = ae.extrinsic_dim
 
-    def lift_sample_paths(self, latent_ensemble) -> np.ndarray:
+    def lift_sample_paths(self, latent_ensemble) -> torch.Tensor:
         # Lift the latent paths to the ambient space
-        lifted_ensemble = np.array([self.autoencoder.decoder(torch.tensor(path, dtype=torch.float32)).detach().numpy()
+        # lifted_ensemble = np.array([self.autoencoder.decoder(torch.tensor(path, dtype=torch.float32)).detach().numpy()
+        #                             for path in latent_ensemble])
+        lifted_ensemble = torch.stack([self.autoencoder.decoder(path)
                                     for path in latent_ensemble])
         return lifted_ensemble
 
