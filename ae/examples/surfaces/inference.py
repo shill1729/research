@@ -2,7 +2,8 @@ from ae.experiments import GeometryError, DynamicsError
 from ae.experiments import Trainer
 from ae.experiments.samplepaths.path_computations import compute_increments
 from ae.experiments.training.helpers import get_time_horizon_name, print_dict
-from train import large_dim, embed, embedding_seed, eps_max
+# Comment out this import on colab, provided you run a code-cell of the code from train.py
+from train import large_dim, embed, embedding_seed, eps_max, device
 import numpy as np
 # TODO: Refactor this to save the mean's of the ensembles of functionals.
 #  That way we can store means
@@ -13,14 +14,15 @@ eps_grid_size = 10
 num_test = 20000
 h = 0.0005
 n_paths = 100
-device = "mps"
 # Define a list of time horizons to test
 time_horizons = [0.5]
 
 # Load the pre-trained model: note working directory is currently ae/experiments
 model_dir = "examples/surfaces/trained_models/ProductSurface/AnisotropicSDE2/trained_20250407-143553_h[64, 64]_df[64, 64]_dr[64, 64]_lr0.001_epochs10000_not_annealed"
 trainer = Trainer.load_from_pretrained(model_dir, large_dim=large_dim)
-
+trainer.models = {name:model.to(device) for name, model in trainer.models.items()}
+trainer.ambient_drift.to(device)
+trainer.ambient_diffusion.to(device)
 # Run geometry error once
 print(trainer.toy_data.large_dim)
 trainer.toy_data.embedding_seed = embedding_seed

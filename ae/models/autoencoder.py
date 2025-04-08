@@ -159,7 +159,7 @@ class AutoEncoder(nn.Module):
                                     for path in latent_ensemble])
         return lifted_ensemble
 
-    def plot_surface(self, a: float, b: float, grid_size: int, ax=None, title=None, dim=3) -> None:
+    def plot_surface(self, a: float, b: float, grid_size: int, ax=None, title=None, dim=3, device="cpu") -> None:
         """
         Plot the surface produced by the neural-network chart.
 
@@ -181,7 +181,7 @@ class AutoEncoder(nn.Module):
             for i in range(grid_size):
                 for j in range(grid_size):
                     x0 = np.column_stack([u[i, j], v[i, j]])
-                    x0 = torch.tensor(x0, dtype=torch.float32)
+                    x0 = torch.tensor(x0, dtype=torch.float32, device=device)
                     xx = self.decoder(x0).detach().numpy()
                     x1[i, j] = xx[0, 0]
                     x2[i, j] = xx[0, 1]
@@ -200,7 +200,7 @@ class AutoEncoder(nn.Module):
             x2 = np.zeros((grid_size, grid_size))
             for i in range(grid_size):
                 x0 = np.column_stack([u[i]])
-                x0 = torch.tensor(x0, dtype=torch.float32)
+                x0 = torch.tensor(x0, dtype=torch.float32, device=device)
                 xx = self.decoder(x0).detach().numpy()
                 x1[i] = xx[0, 0]
                 x2[i] = xx[0, 1]

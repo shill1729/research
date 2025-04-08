@@ -6,21 +6,22 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-def plot_interior_boundary_highlight(epsilon, toydata: ToyData, aedf: AutoEncoderDiffusion, title=None):
+def plot_interior_boundary_highlight(epsilon, toydata: ToyData, aedf: AutoEncoderDiffusion, title=None, device="cpu"):
     fig = plt.figure()
     ax = plt.subplot(1, 1, 1, projection="3d")
 
     # Set the point cloud domain to [a - ε, b + ε]^2
 
     toydata.set_point_cloud(epsilon)
-
+    # These are the original bounds.
     a = toydata.surface.bounds()[0][0]
     b = toydata.surface.bounds()[0][1]
 
     # Plot the learned surface
-    aedf.autoencoder.plot_surface(a-epsilon, b+epsilon, 30, ax, title)
+    aedf.autoencoder.plot_surface(a-epsilon, b+epsilon, 30, ax, title, device=device)
 
-    # Get data from the point cloud
+    # Get data from the point cloud. For this function we are plotting the true data ambiently and locally
+    # by embedding it at z=0 or some arbitrarily chosen floor. So no device passing is needed here.
     data = toydata.point_cloud.generate()
     x = data[0]         # Embedded 3D points on the learned surface
     local_x = data[4]   # Original 2D input points
@@ -54,26 +55,26 @@ def plot_interior_boundary_highlight(epsilon, toydata: ToyData, aedf: AutoEncode
     return fig
 
 
-def plot_interior_boundary_recon(epsilon, toydata: ToyData, aedf: AutoEncoderDiffusion, title=None):
+def plot_interior_boundary_recon(epsilon, toydata: ToyData, aedf: AutoEncoderDiffusion, title=None, device="device"):
     fig = plt.figure()
     ax = plt.subplot(1, 1, 1, projection="3d")
 
     # Set the point cloud domain to [a - ε, b + ε]^2
 
     toydata.set_point_cloud(epsilon)
-
+    # TODO: review this again. Why is it different the above function? Just these next 3 lines.
     a = toydata.surface.bounds()[0][0]
     b = toydata.surface.bounds()[0][1]
 
     # Plot the learned surface
-    aedf.autoencoder.plot_surface(toydata.point_cloud.bounds[0][0], toydata.point_cloud.bounds[0][1],
-                                  30, ax, title)
+    aedf.autoencoder.plot_surface(a-epsilon, b+epsilon,
+                                  30, ax, title, device)
 
     # Get data from the point cloud
     data = toydata.point_cloud.generate()
 
     x = data[0]         # Embedded 3D points on the learned surface
-    model_local_x = aedf.autoencoder.encoder.forward(torch.tensor(x, dtype=torch.float32))
+    model_local_x = aedf.autoencoder.encoder.forward(torch.tensor(x, dtype=torch.float32, device=device))
     model_x = aedf.autoencoder.decoder.forward(model_local_x).detach().numpy()
     local_x = data[4] # True local x
 
