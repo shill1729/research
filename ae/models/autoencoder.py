@@ -182,7 +182,7 @@ class AutoEncoder(nn.Module):
                 for j in range(grid_size):
                     x0 = np.column_stack([u[i, j], v[i, j]])
                     x0 = torch.tensor(x0, dtype=torch.float32, device=device)
-                    xx = self.decoder(x0).detach().numpy()
+                    xx = self.decoder(x0).cpu().detach().numpy()
                     x1[i, j] = xx[0, 0]
                     x2[i, j] = xx[0, 1]
                     x3[i, j] = xx[0, 2]
