@@ -42,8 +42,8 @@ class SamplePathGenerator:
         ambient_paths = model.lift_sample_paths(latent_paths)
         return ambient_paths, latent_paths
 
-    @staticmethod
-    def __get_z0(model: AutoEncoderDiffusion, x0_torch, name):
+
+    def __get_z0(self, model: AutoEncoderDiffusion, x0_torch, name):
         """
 
         :param model:
@@ -51,10 +51,12 @@ class SamplePathGenerator:
         :param name:
         :return:
         """
+        print("trainer object's device = "+self.trainer.device)
+        model.to(self.trainer.device)
         z0_tensor = model.autoencoder.encoder(x0_torch)
-        x0_hat = model.autoencoder.decoder(z0_tensor).detach().numpy().squeeze(0)
+        x0_hat = model.autoencoder.decoder(z0_tensor).cpu().detach().numpy().squeeze(0)
 
-        x0_numpy = x0_torch.squeeze(0).detach().numpy()
+        x0_numpy = x0_torch.squeeze(0).cpu().detach().numpy()
         z0_numpy = z0_tensor.detach().numpy().squeeze(0)
         print("\n " + str(name))
         print("l1 Recon Error for x0 = " + str(np.linalg.vector_norm(x0_hat - x0_numpy, ord=1)))
