@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
+# TODO make a version of this that plot's the model's latent space on the ground z=0 (or some low number) instead
+#  of the true local coordinates.
 def plot_interior_boundary_highlight(epsilon, toydata: ToyData, aedf: AutoEncoderDiffusion, title=None, device="cpu"):
     fig = plt.figure()
     ax = plt.subplot(1, 1, 1, projection="3d")
@@ -51,24 +53,22 @@ def plot_interior_boundary_highlight(epsilon, toydata: ToyData, aedf: AutoEncode
 
     ax.set_title(title or "Interior and Boundary Points Highlighted")
     ax.legend()
+    fig.canvas.draw()
     plt.show()
     return fig
 
 
-def plot_interior_boundary_recon(epsilon, toydata: ToyData, aedf: AutoEncoderDiffusion, title=None, device="device"):
+def plot_interior_boundary_recon(epsilon, toydata: ToyData, aedf: AutoEncoderDiffusion, title=None, device="cpu"):
     fig = plt.figure()
     ax = plt.subplot(1, 1, 1, projection="3d")
 
     # Set the point cloud domain to [a - ε, b + ε]^2
-
     toydata.set_point_cloud(epsilon)
-    # TODO: review this again. Why is it different the above function? Just these next 3 lines.
     a = toydata.surface.bounds()[0][0]
     b = toydata.surface.bounds()[0][1]
 
     # Plot the learned surface
-    aedf.autoencoder.plot_surface(a-epsilon, b+epsilon,
-                                  30, ax, title, device)
+    aedf.autoencoder.plot_surface(a-epsilon, b+epsilon,30, ax, title, device=device)
 
     # Get data from the point cloud
     data = toydata.point_cloud.generate()
@@ -103,7 +103,10 @@ def plot_interior_boundary_recon(epsilon, toydata: ToyData, aedf: AutoEncoderDif
 
     ax.set_title(title or "Interior and Boundary Points Highlighted")
     ax.legend()
+
+    fig.canvas.draw()
     plt.show()
+    plt.close(fig)
     return fig
 
 

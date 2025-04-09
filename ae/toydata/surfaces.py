@@ -121,7 +121,7 @@ class Paraboloid(SurfaceBase):
         return sp.Matrix([self.u, self.v, fuv])
 
     def bounds(self):
-        return [(-2., 2.), (-2., 2.)]
+        return [(-1., 1.), (-1., 1.)]
 
 
 class ProductSurface(SurfaceBase):

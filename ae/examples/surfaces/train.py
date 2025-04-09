@@ -1,3 +1,5 @@
+import os
+
 import torch
 
 from ae.toydata import ToyData
@@ -29,7 +31,8 @@ eps_max = 0.5
 # TODO: currently does not work for the boundary initial point of the sample paths. So it is broken for now.
 large_dim = None
 embed = False # Bool for embedding or not
-
+print("Current working directory of train.py")
+print(os.getcwd())
 
 if __name__ == "__main__":
 
@@ -42,15 +45,15 @@ if __name__ == "__main__":
     eps_grid_size = 10
     # The intrinsic and extrinsic dimensions.
     extrinsic_dim, intrinsic_dim = 3, 2
-    hidden_dims = [2]
-    diffusion_layers = [2]
-    drift_layers = [2]
+    hidden_dims = [16]
+    diffusion_layers = [4]
+    drift_layers = [4]
     lr = 0.001
     weight_decay = 0.001
-    epochs_ae = 2
-    epochs_diffusion = 2
-    epochs_drift = 2
-    print_freq = 1
+    epochs_ae = 100
+    epochs_diffusion = 100
+    epochs_drift = 100
+    print_freq = 1000
     # Diffeo weight for accumulative orders
     diffeo_weight_12 = 0.2 # this is the separate diffeo_weight for just the First order and second order
     # First order weight: 0.08 was good

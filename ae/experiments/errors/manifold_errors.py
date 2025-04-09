@@ -197,6 +197,6 @@ class GeometryError:
     def plot_int_bd_surface(self, epsilon=0.5):
         for name, model in self.trainer.models.items():
             fig = plot_interior_boundary_highlight(epsilon, self.toydata, model, name, self.device)
-            save_plot(fig, self.trainer.exp_dir, plot_name="interior_boundary_highlight_gt_pts")
-            fig = plot_interior_boundary_recon(epsilon, self.toydata, model, name, self.device)
-            save_plot(fig, self.trainer.exp_dir, plot_name="interior_boundary_highlight_recon_pts")
+            save_plot(fig, self.trainer.exp_dir, plot_name=name+"_interior_boundary_highlight_gt_pts")
+            fig2 = plot_interior_boundary_recon(epsilon, self.toydata, model, name, self.device)
+            save_plot(fig2, self.trainer.exp_dir, plot_name=name+"_interior_boundary_highlight_recon_pts")

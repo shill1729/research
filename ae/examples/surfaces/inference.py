@@ -5,6 +5,10 @@ from ae.experiments.training.helpers import get_time_horizon_name, print_dict
 # Comment out this import on colab, provided you run a code-cell of the code from train.py
 from train import large_dim, embed, embedding_seed, eps_max, device
 import numpy as np
+import os
+print("Current working directory of inference.py")
+print(os.getcwd())
+
 # TODO: Refactor this to save the mean's of the ensembles of functionals.
 #  That way we can store means
 # Settings that remain constant
@@ -18,7 +22,7 @@ n_paths = 5
 time_horizons = [0.5]
 
 # Load the pre-trained model: note working directory is currently ae/experiments
-model_dir = "examples/surfaces/trained_models/ProductSurface/AnisotropicSDE2/trained_20250407-143553_h[64, 64]_df[64, 64]_dr[64, 64]_lr0.001_epochs10000_not_annealed"
+model_dir = "examples/surfaces/trained_models/Paraboloid/RiemannianBrownianMotion/trained_20250409-181306_h[16]_df[4]_dr[4]_lr0.001_epochs100_not_annealed"
 trainer = Trainer.load_from_pretrained(model_dir, device=device, large_dim=large_dim)
 trainer.models = {name:model.to(device) for name, model in trainer.models.items()}
 trainer.ambient_drift.to(device)
@@ -30,7 +34,7 @@ print(trainer.toy_data.large_dim)
 trainer.toy_data.embedding_seed = embedding_seed
 geometry = GeometryError(trainer.toy_data, trainer, eps_max, device, show=show_geo, embed=embed)
 # geometry.compute_and_plot_errors(eps_grid_size, num_test, None)
-# geometry.plot_int_bd_surface(epsilon=eps_max)
+geometry.plot_int_bd_surface(epsilon=eps_max)
 
 # Loop over each time horizon and run dynamics error analysis
 for tn in time_horizons:
