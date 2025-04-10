@@ -33,7 +33,7 @@ trainer.device = device
 print(trainer.toy_data.large_dim)
 trainer.toy_data.embedding_seed = embedding_seed
 geometry = GeometryError(trainer.toy_data, trainer, eps_max, device, show=show_geo, embed=embed)
-# geometry.compute_and_plot_errors(eps_grid_size, num_test, None)
+geometry.compute_and_plot_errors(eps_grid_size, num_test, None)
 geometry.plot_int_bd_surface(epsilon=eps_max)
 
 # Loop over each time horizon and run dynamics error analysis
