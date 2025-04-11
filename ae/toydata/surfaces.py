@@ -111,7 +111,7 @@ class WaveSurface(SurfaceBase):
 
 
 class Paraboloid(SurfaceBase):
-    def __init__(self, a=2, b=2):
+    def __init__(self, a=1., b=1.):
         super().__init__()
         self.a = a
         self.b = b
@@ -122,6 +122,32 @@ class Paraboloid(SurfaceBase):
 
     def bounds(self):
         return [(-1., 1.), (-1., 1.)]
+
+class ShallowParaboloid(SurfaceBase):
+    def __init__(self, a=3, b=3):
+        super().__init__()
+        self.a = a
+        self.b = b
+
+    def equation(self):
+        fuv = (self.u / self.a) ** 2 + (self.v / self.b) ** 2
+        return sp.Matrix([self.u, self.v, fuv])
+
+    def bounds(self):
+        return [(-1.5, 1.5), (-1.5, 1.5)]
+
+class DeepParaboloid(SurfaceBase):
+    def __init__(self, a=0.5, b=0.5):
+        super().__init__()
+        self.a = a
+        self.b = b
+
+    def equation(self):
+        fuv = (self.u / self.a) ** 2 + (self.v / self.b) ** 2
+        return sp.Matrix([self.u, self.v, fuv])
+
+    def bounds(self):
+        return [(-1.5, 1.5), (-1.5, 1.5)]
 
 
 class ProductSurface(SurfaceBase):

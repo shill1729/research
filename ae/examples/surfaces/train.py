@@ -38,30 +38,30 @@ if __name__ == "__main__":
 
     # torch.manual_seed(train_seed)
     # Point cloud parameters
-    num_points = 100
+    num_points = 30
     num_test = 20000
     batch_size = int(num_points/2)
 
     eps_grid_size = 10
     # The intrinsic and extrinsic dimensions.
     extrinsic_dim, intrinsic_dim = 3, 2
-    hidden_dims = [16]
-    diffusion_layers = [4]
-    drift_layers = [4]
+    hidden_dims = [4]
+    diffusion_layers = [2]
+    drift_layers = [2]
     lr = 0.001
     weight_decay = 0.001
-    epochs_ae = 100
-    epochs_diffusion = 100
-    epochs_drift = 100
+    epochs_ae = 1000
+    epochs_diffusion = 1000
+    epochs_drift = 1000
     print_freq = 1000
     # Diffeo weight for accumulative orders
-    diffeo_weight_12 = 0.2 # this is the separate diffeo_weight for just the First order and second order
+    diffeo_weight_12 = 0.1 # this is the separate diffeo_weight for just the First order and second order
     # First order weight: 0.08 was good
-    tangent_angle_weight = 0.2
+    tangent_angle_weight = 0.1
     # Second order weights accumulative
-    tangent_angle_weight2 = 0.05  # the first order weight for the second order model, if accumulating penalties
-    tangent_drift_weight = 0.05
-    surface = Paraboloid()
+    tangent_angle_weight2 = 0.01  # the first order weight for the second order model, if accumulating penalties
+    tangent_drift_weight = 0.01
+    surface = ShallowParaboloid()
     dynamics = RiemannianBrownianMotion()
     if embed:
         extrinsic_dim = large_dim

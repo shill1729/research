@@ -53,7 +53,7 @@ class LatentNeuralSDE(nn.Module):
         """
         return self.diffusion_net(z).view((z.size(0), self.intrinsic_dim, self.intrinsic_dim))
 
-    def latent_drift_fit(self, t: float, z: np.ndarray) -> np.ndarray:
+    def latent_drift_numpy(self, t: float, z: np.ndarray) -> np.ndarray:
         """ For numpy EM SDE solvers"""
         with torch.no_grad():
             return self.drift_net(torch.tensor(z, dtype=torch.float32)).cpu().detach().numpy()
@@ -63,7 +63,7 @@ class LatentNeuralSDE(nn.Module):
         with torch.no_grad():
             return self.drift_net(z)
 
-    def latent_diffusion_fit(self, t: float, z: np.ndarray) -> np.ndarray:
+    def latent_diffusion_numpy(self, t: float, z: np.ndarray) -> np.ndarray:
         """ For numpy EM SDE solvers"""
         d = z.shape[0]
         with torch.no_grad():
@@ -75,7 +75,7 @@ class LatentNeuralSDE(nn.Module):
         with torch.no_grad():
             return self.diffusion_net(z).view((d, d))
 
-    def sample_paths(self, z0: np.ndarray, tn: float, ntime: int, npaths: int) -> np.ndarray:
+    def sample_paths(self, z0: Tensor, tn: float, ntime: int, npaths: int) -> Tensor:
         """
 
         :param z0:
@@ -88,7 +88,8 @@ class LatentNeuralSDE(nn.Module):
         # latent_sde = SDE(self.latent_drift_fit, self.latent_diffusion_fit)
         latent_sde = SDEtorch(self.latent_drift_torch, self.latent_diffusion_torch)
         # Generate sample ensemble
-        latent_ensemble = latent_sde.sample_ensemble(z0, tn, ntime, npaths, noise_dim=self.intrinsic_dim)
+        latent_ensemble = latent_sde.sample_ensemble(z0, tn, ntime, npaths, noise_dim=self.intrinsic_dim,
+                                                     device=z0.device)
         return latent_ensemble
 
 

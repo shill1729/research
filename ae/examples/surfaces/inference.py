@@ -16,13 +16,13 @@ show_geo = True
 show_stats = True
 eps_grid_size = 10
 num_test = 20000
-h = 0.01
-n_paths = 5
+h = 0.001
+n_paths = 100
 # Define a list of time horizons to test
 time_horizons = [0.5]
 
 # Load the pre-trained model: note working directory is currently ae/experiments
-model_dir = "examples/surfaces/trained_models/Paraboloid/RiemannianBrownianMotion/trained_20250409-181306_h[16]_df[4]_dr[4]_lr0.001_epochs100_not_annealed"
+model_dir = "examples/surfaces/trained_models/ShallowParaboloid/RiemannianBrownianMotion/trained_20250411-140103_h[4]_df[2]_dr[2]_lr0.001_epochs1000_not_annealed"
 trainer = Trainer.load_from_pretrained(model_dir, device=device, large_dim=large_dim)
 trainer.models = {name:model.to(device) for name, model in trainer.models.items()}
 trainer.ambient_drift.to(device)
@@ -32,9 +32,9 @@ trainer.device = device
 # Run geometry error once
 print(trainer.toy_data.large_dim)
 trainer.toy_data.embedding_seed = embedding_seed
-geometry = GeometryError(trainer.toy_data, trainer, eps_max, device, show=show_geo, embed=embed)
-geometry.compute_and_plot_errors(eps_grid_size, num_test, None)
-geometry.plot_int_bd_surface(epsilon=eps_max)
+# geometry = GeometryError(trainer.toy_data, trainer, eps_max, device, show=show_geo, embed=embed)
+# geometry.compute_and_plot_errors(eps_grid_size, num_test, None)
+# geometry.plot_int_bd_surface(epsilon=eps_max)
 
 # Loop over each time horizon and run dynamics error analysis
 for tn in time_horizons:

@@ -372,6 +372,7 @@ class SDEtorch:
             gen = torch.Generator(device=device).manual_seed(seed)
         else:
             gen = torch.Generator(device=device)
+            gen.seed()
 
 
         for i in range(ntime):
@@ -396,11 +397,13 @@ class SDEtorch:
         :param dtype: torch dtype
         :return: tensor of shape (npaths, ntime+1, d)
         """
-        x0 = x0.to(dtype=dtype, device=device or x0.device)
+        if device is None:
+            device = x0.device
+        x0 = x0.to(dtype=dtype, device=device)
         if x0.ndim == 0:
             x0 = x0.unsqueeze(0)
         d = x0.shape[0]
-        paths = torch.zeros((npaths, ntime + 1, d), dtype=dtype, device=device or x0.device)
+        paths = torch.zeros((npaths, ntime + 1, d), dtype=dtype, device=device)
         for i in range(npaths):
             paths[i] = self.solve(x0, tn, ntime, t0, seed=None, noise_dim=noise_dim, device=device, dtype=dtype)
         return paths
