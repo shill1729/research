@@ -346,7 +346,7 @@ class DiffeomorphicRegularization(nn.Module):
 @dataclass
 class LossWeights:
     reconstruction: float = 1.
-    encoder_contraction_weight: float = 0.0
+    encoder_contraction_weight: float = 0.001
     decoder_contraction_weight: float = 0.0
     tangent_space_error_weight: float = 0.0
     tangent_angle_weight: float = 0.0

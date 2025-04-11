@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 
 from ae.toydata.datagen import ToyData
@@ -93,7 +94,7 @@ class GeometryError:
         h_test_full = test_dict["orthonormal_frame"]
         local_x_test_full = test_dict["local_x"]
 
-        epsilons = np.linspace(0.05, self.eps_max, eps_grid_size)
+        epsilons = np.linspace(0.01, self.eps_max, eps_grid_size)
 
         loss_keys = [
             "reconstruction loss", "encoder contractive loss", "decoder contractive loss",
@@ -107,16 +108,24 @@ class GeometryError:
         ambient_drift_losses = []
         ambient_diffusion_losses = []
 
-        # Not sure why this isnt working
-        # interior_mask = self.is_interior_local(local_x_test_full, self.toydata.surface.bounds())
-        # for name, model in self.ae_dict.items():
-        #     x_test = x_test_full[interior_mask]
-        #     mu_test = mu_test_full[interior_mask]
-        #     cov_test = cov_test_full[interior_mask]
-        #     p_test = p_test_full[interior_mask]
-        #     h_test = h_test_full[interior_mask]
-        #     losses = self.subset_error(interior_mask, model, x_test, mu_test, cov_test, p_test, h_test)
-        #     print(losses)
+        # Print interior losses
+        interior_mask = self.is_interior_local(local_x_test_full, self.toydata.surface.bounds())
+        results = {}
+        for name, model in self.ae_dict.items():
+            losses_subset, drift_loss, diffusion_loss, ambient_drift_loss, ambient_diff_loss = \
+                self.subset_error(interior_mask, model, x_test_full, mu_test_full, cov_test_full, p_test_full,
+                                  h_test_full)
+
+            combined_losses = {**losses_subset,
+                               'drift_loss': drift_loss,
+                               'diffusion_loss': diffusion_loss,
+                               'ambient_drift_loss': ambient_drift_loss,
+                               'ambient_diff_loss': ambient_diff_loss}
+
+            results[name] = combined_losses
+        interior_test_loss_df = pd.DataFrame(results)
+        print("Interior test loss:")
+        print(interior_test_loss_df)
 
         for eps in epsilons:
             current_bounds = [(b[0] - eps, b[1] + eps) for b in self.toydata.surface.bounds()]
@@ -130,7 +139,7 @@ class GeometryError:
             local_x_test = local_x_test_full[current_mask]
             interior_mask = self.is_interior_local(local_x_test, self.toydata.surface.bounds())
             boundary_mask = ~interior_mask
-            # TODO: compute interior loss just once. maybe outside this loop? just masking
+
             for name, model in self.ae_dict.items():
                 losses = self.subset_error(boundary_mask, model, x_test, mu_test, cov_test, p_test, h_test)
                 if losses is not None:

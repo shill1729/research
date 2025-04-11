@@ -134,7 +134,8 @@ class ShallowParaboloid(SurfaceBase):
         return sp.Matrix([self.u, self.v, fuv])
 
     def bounds(self):
-        return [(-1.5, 1.5), (-1.5, 1.5)]
+        bd = 2.
+        return [(-bd, bd), (-bd, bd)]
 
 class DeepParaboloid(SurfaceBase):
     def __init__(self, a=0.5, b=0.5):

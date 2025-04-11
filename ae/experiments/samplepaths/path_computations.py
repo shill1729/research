@@ -19,7 +19,12 @@ def apply_function(gt, amb, aes: dict, func):
     :param func:
     :return:
     """
-    gt_func = func(torch.tensor(gt, dtype=torch.float32, device=amb.device))
+    # gt_func = func(torch.tensor(gt, dtype=torch.float32, device=amb.device))
+    if type(gt) is np.ndarray:
+        gt_torch = torch.tensor(gt, dtype=torch.float32, device=amb.device)
+    else:
+        gt_torch = gt
+    gt_func = func(gt_torch)
     amb_func = func(amb)
     aes_func = {name: func(ensemble) for name, ensemble in aes.items()}
     return gt_func, amb_func, aes_func
