@@ -5,6 +5,7 @@ from ae.toydata.sampler import ImportanceSampler
 from ae.symbolic.diffgeo import RiemannianManifold
 from matplotlib.patches import Ellipse
 import numpy as np
+import torch
 
 
 class PointCloud:
@@ -29,6 +30,7 @@ class PointCloud:
         self.dimension = len(manifold.local_coordinates)
         self.target_dim = len(manifold.chart)
         self.chart_jacobian = self.manifold.chart_jacobian()
+
         if compute_orthogonal_proj:
             self.orthogonal_proj = self.manifold.orthogonal_projection(method="pow")
             self.np_orthogonal_proj = self.manifold.sympy_to_numpy(self.orthogonal_proj)
@@ -36,7 +38,11 @@ class PointCloud:
         # Create numpy functions
         self.np_volume_measure = self.manifold.sympy_to_numpy(self.manifold.volume_density())
         self.np_phi = self.manifold.sympy_to_numpy(self.manifold.chart)
-        self.np_jacobian = self.manifold.sympy_to_numpy(self.chart_jacobian)
+        self.np_chart_jacobian = self.manifold.sympy_to_numpy(self.chart_jacobian)
+
+        self.np_implicit_func = self.manifold.sympy_to_numpy(self.manifold.implicit_function(), False)
+        self.np_implicit_func_jacob = self.manifold.sympy_to_numpy(self.manifold.implicit_function_jacobian(),
+                                                                   False)
 
         # Create importance sampler
         self.sampler = self._create_importance_sampler()
@@ -382,6 +388,7 @@ if __name__ == "__main__":
         local_coordinates=sp.Matrix([u, v]),
         chart=sp.Matrix([r * sp.cos(v) * sp.cos(u), r * sp.cos(v) * sp.sin(u), r * sp.sin(v)])
     )
+
 
     torus_manifold = RiemannianManifold(
         local_coordinates=sp.Matrix([u, v]),

@@ -160,5 +160,34 @@ class AutoEncoderDiffusion(nn.Module):
         cov_model = torch.bmm(dphi, torch.bmm(bbt, dphi.mT))
         return cov_model
 
+    def compute_ambient_diffusion(self, x: Tensor) -> Tensor:
+        z, dphi, b, q = self.compute_sde_manifold_tensors(x)
+        diffusion = torch.bmm(dphi, b)
+        return diffusion
+
+    def ambient_diffusion_wrapper(self, t, x: Tensor):
+        return self.compute_ambient_diffusion(x.view((1, 2))).view((2, ))
+
+    def ambient_drift_wrapper(self, t, x: Tensor):
+        return self.compute_ambient_drift(x.view((1, 2))).view((2, ))
+
+    def direct_ambient_sample_paths(self, x0: Tensor, tn: float, ntime: int, npaths: int) -> Tensor:
+        """
+
+        :param z0:
+        :param tn:
+        :param ntime:
+        :param npaths:
+        :return:
+        """
+        # Initialize SDE object
+        # latent_sde = SDE(self.latent_drift_fit, self.latent_diffusion_fit)
+        ambient_sde = SDEtorch(self.ambient_drift_wrapper, self.ambient_diffusion_wrapper)
+        # Generate sample ensemble
+        ambient_ensemble = ambient_sde.sample_ensemble(x0, tn, ntime, npaths, noise_dim=self.extrinsic_dim,
+                                                     device=x0.device)
+        return ambient_ensemble
+
+
 
 

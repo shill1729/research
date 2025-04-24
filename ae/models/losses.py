@@ -346,7 +346,7 @@ class DiffeomorphicRegularization(nn.Module):
 @dataclass
 class LossWeights:
     reconstruction: float = 1.
-    encoder_contraction_weight: float = 0.001
+    encoder_contraction_weight: float = 0.0
     decoder_contraction_weight: float = 0.0
     tangent_space_error_weight: float = 0.0
     tangent_angle_weight: float = 0.0
@@ -486,6 +486,7 @@ class LocalDiffusionLoss(nn.Module):
         super().__init__()
         self.cov_mse = MatrixMSELoss(norm=norm)
 
+    # TODO: rename "encoded_cov" to "ambient_cov"
     def forward(self, ae_diffusion: AutoEncoderDiffusion, x: Tensor, encoded_cov: Tensor):
         """
         Computes the total loss for the AutoEncoderDiffusion model.
@@ -504,10 +505,16 @@ class LocalDiffusionLoss(nn.Module):
         total_loss : Tensor
             The computed total loss combining covariance MSE, local covariance MSE, and weighted tangent drift loss.
         """
+        # TODO: decide between latent or ambient targeting for the AE_SDE coeff MSE training
         bbt = ae_diffusion.compute_local_covariance(x)
         local_cov_mse = self.cov_mse(bbt, encoded_cov)
         total_loss = local_cov_mse
         return total_loss
+
+        # ambient MSE for AE models
+        # model_ambient_cov = ae_diffusion.compute_ambient_covariance(x)
+        # cov_mse = self.cov_mse(model_ambient_cov, cov)
+        # return cov_mse
 
 
 class LocalDriftLoss(nn.Module):
@@ -534,8 +541,9 @@ class LocalDriftLoss(nn.Module):
         super().__init__(*args, **kwargs)
 
     @staticmethod
-    def forward(ae_diffusion: AutoEncoderDiffusion, x: Tensor,
-                observed_ambient_drift: Tensor) -> Tensor:
+    def forward(ae_diffusion: AutoEncoderDiffusion,
+                x: Tensor,
+                targets: Tensor) -> Tensor:
         """
         Computes the loss for the AutoEncoderDrift model.
 
@@ -554,7 +562,18 @@ class LocalDriftLoss(nn.Module):
         loss : Tensor
             The computed loss combining ambient drift error and latent drift error.
         """
-        z, _, _, q = ae_diffusion.compute_sde_manifold_tensors(x)
+        # TODO: currently trying to decide between AE-SDE latent drift MSE or ambient drift MSE
+        # TODO: also consider using the encoded observed covariance instead of the pre-trained network bb^T to compute
+        #  q the correction from Ito's
+        # This code uses the latent diffusion model for q
+        # z, _, _, q = ae_diffusion.compute_sde_manifold_tensors(x)
+        observed_ambient_drift, cov = targets
+        # This code uses the encoded covariance from the AE
+        z = ae_diffusion.autoencoder.encoder(x)
+        dpi = ae_diffusion.autoencoder.encoder_jacobian(x)
+        encoded_cov = torch.bmm(dpi, torch.bmm(cov, dpi.mT))
+        hessian_decoder = ae_diffusion.autoencoder.decoder_hessian(z)
+        q = ambient_quadratic_variation_drift(encoded_cov, hessian_decoder)
         model_latent_drift = ae_diffusion.latent_sde.drift_net.forward(z)
         dpi = ae_diffusion.autoencoder.encoder_jacobian(x)
         tangent_drift_vector = observed_ambient_drift - 0.5 * q
@@ -564,3 +583,10 @@ class LocalDriftLoss(nn.Module):
         # jacobian = ae_diffusion.latent_sde.drift_net.jacobian_network(z)
         # weight_matrix_reg = torch.linalg.matrix_norm(jacobian, ord="fro").mean(dim=0)
         return latent_drift_mse
+
+        # TODO: pick between local and ambient drift
+        # model_ambient_drift = ae_diffusion.compute_ambient_drift(x)
+        # ambient_drift_error = torch.linalg.vector_norm(model_ambient_drift - observed_ambient_drift, dim=1, ord=2)
+        # mse = torch.mean(ambient_drift_error, dim=0)
+        # return mse
+

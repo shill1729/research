@@ -10,7 +10,7 @@ from ae.models.ambient_sdes import AmbientDriftNetwork, AmbientDiffusionNetwork
 from ae.utils.performance_analysis import compute_test_losses
 from ae.experiments.training.helpers import save_plot
 from ae.experiments.training.training import Trainer
-from ae.utils.plot_functions import plot_interior_boundary_highlight, plot_interior_boundary_recon
+from ae.utils.plot_functions import plot_interior_boundary_highlight, plot_interior_boundary_recon, plot_interior_boundary_latent
 
 class GeometryError:
     def __init__(self, toydata: ToyData, trainer: Trainer,
@@ -209,3 +209,5 @@ class GeometryError:
             save_plot(fig, self.trainer.exp_dir, plot_name=name+"_interior_boundary_highlight_gt_pts")
             fig2 = plot_interior_boundary_recon(epsilon, self.toydata, model, name, self.device)
             save_plot(fig2, self.trainer.exp_dir, plot_name=name+"_interior_boundary_highlight_recon_pts")
+            fig3 = plot_interior_boundary_latent(epsilon, self.toydata, model, name, self.device)
+            save_plot(fig3, self.trainer.exp_dir, plot_name=name + "_interior_boundary_highlight_latent_pts")

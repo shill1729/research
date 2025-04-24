@@ -376,7 +376,7 @@ class SamplePathPlotter:
         # Generate all plots
         self.plot_time_series_with_errors(results)
         # self.plot_time_series_with_confidence(results)
-        # TODO we nee dto lift the ground truth sample paths whne we e embed.
+        # TODO we need to lift the ground truth sample paths when we embed.
         self.plot_deviation_of_means(results, False, plot_name="state")
         # self.plot_deviation_of_means(results, True, plot_name="state")
         self.plot_mean_deviation(results, plot_name="state")

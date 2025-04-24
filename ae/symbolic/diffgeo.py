@@ -31,6 +31,7 @@ class RiemannianManifold:
         """
         self.local_coordinates = local_coordinates
         self.chart = chart
+        self.y = sp.symbols("y", real=True)
 
     def chart_jacobian(self) -> Matrix:
         """
@@ -40,6 +41,18 @@ class RiemannianManifold:
             Matrix: The Jacobian matrix of the chart.
         """
         return sp.simplify(self.chart.jacobian(self.local_coordinates))
+
+    def implicit_function(self):
+        if len(self.chart) == 2:
+            return sp.Matrix([self.y - self.chart[1]])
+        elif len(self.chart) == 3:
+            return sp.Matrix([self.y - self.chart[2]])
+
+    def implicit_function_jacobian(self):
+        if len(self.chart) == 2:
+            return self.implicit_function().jacobian([self.local_coordinates[0], self.y])
+        elif len(self.chart) == 3:
+            return self.implicit_function().jacobian([self.local_coordinates[0], self.local_coordinates[1], self.y])
 
     def metric_tensor(self) -> Matrix:
         """
@@ -356,8 +369,11 @@ class RiemannianManifold:
             equations.append(eq)
         return equations
 
-    def sympy_to_numpy(self, expr) -> Callable:
-        return sp.lambdify(self.local_coordinates, expr, modules='numpy')
+    def sympy_to_numpy(self, expr, local_coord=True) -> Callable:
+        if local_coord:
+            return sp.lambdify(self.local_coordinates, expr, modules='numpy')
+        else:
+            return sp.lambdify(sp.Matrix([self.local_coordinates, self.y]), expr, modules='numpy')
 
     def create_local_bm_sde(self) -> SDE:
         # print("Computing local drift...")
@@ -473,6 +489,11 @@ if __name__ == "__main__":
     print("Simulating paths...")
     local_paths, global_paths = man.simulate_rbm(x0, tn, ntime, npaths)
     man.plot_rbm(local_paths, global_paths)
+    print("\nImplicit function")
+    print(man.implicit_function())
+
+    print("\nImplicit function jacobian")
+    print(man.implicit_function_jacobian())
 
     print("\nChart Jacobian:")
     print(man.chart_jacobian())

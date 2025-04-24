@@ -71,25 +71,24 @@ class RiemannianBrownianMotion(DynamicsBase):
         return manifold.local_bm_diffusion()
 
 
-# TODO: We should refactor this internally, but keep the same names for the folder directory structure.
 class LangevinHarmonicOscillator(DynamicsBase):
 
     def __init__(self, temperature=1.):
         super().__init__()
         self.temperature = temperature
         self.inverse_temp = 1 / temperature
-        self.volatility = 0.5
+        self.volatility = 0.1
 
     def drift(self, manifold: RiemannianManifold):
         # Define a potential based on the dimension
         if manifold.local_coordinates.shape[0] == 2:
             harmonic_potential = sp.Matrix([
-                self.u-2.5,
-                self.v-2.5
+                self.u-1.5,
+                self.v-1.5
             ])
         elif manifold.local_coordinates.shape[0] == 1:
             harmonic_potential = sp.Matrix([
-                self.u - 0.5
+                self.u - 1.
             ])
         else:
             raise NotImplementedError("Only intrinsic dimensions 2 and 1 are implemented")
@@ -106,16 +105,21 @@ class LangevinHarmonicOscillator(DynamicsBase):
 
 class LangevinDoubleWell(DynamicsBase):
     def drift(self, manifold: RiemannianManifold):
-        double_well_potential = sp.Matrix([
-            self.u * (self.u ** 2 - 0.4),
-            self.v / 2
-        ])/8
+        if manifold.local_coordinates.shape[0] == 2:
+            double_well_potential = sp.Matrix([
+                self.u * (self.u ** 2 - 0.4),
+                self.v / 2
+            ])/8
+        elif manifold.local_coordinates.shape[0] == 1:
+            double_well_potential = sp.Matrix([self.u * (self.u ** 2 - 0.4)]) / 8
+        else:
+            raise NotImplementedError("Only intrinsic dimensions 2 and 1 are implemented")
         manifold_drift = manifold.local_bm_drift()
         potential = manifold.metric_tensor().inv() * double_well_potential
-        return -0.5 * potential + manifold_drift * 0.05
+        return -0.5 * potential + manifold_drift
 
     def diffusion(self, manifold: RiemannianManifold):
-        return manifold.local_bm_diffusion() * 0.05
+        return manifold.local_bm_diffusion()
 
 
 class LangevinGaussianWell(DynamicsBase):

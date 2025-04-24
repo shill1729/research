@@ -3,7 +3,9 @@ import numpy as np
 import streamlit as st
 import sympy as sp
 from matplotlib.patches import Ellipse
-from scipy.optimize import minimize
+from scipy.optimize import minimize, minimize_scalar
+
+
 
 
 def precompute_A_inverses(xs, A_list):
@@ -39,6 +41,7 @@ def compute_K(lmbd, eps, xs, A_inv_array, x_Ainv_x):
     :return:
     """
     A_lambda_inv = np.tensordot(lmbd, A_inv_array, axes=([0], [0]))
+    # TODO: extract this into its own m_lambda function
     S = np.sum(lmbd[:, None] * np.einsum('ijk,ik->ij', A_inv_array, xs), axis=0)
     try:
         m_lambda = np.linalg.solve(A_lambda_inv, S)
@@ -49,6 +52,15 @@ def compute_K(lmbd, eps, xs, A_inv_array, x_Ainv_x):
     sum_term = np.dot(lmbd, x_Ainv_x)
     return eps ** 2 - (sum_term - quad_term)
 
+def compute_m(lmbd, xs, A_inv_array):
+    A_lambda_inv = np.tensordot(lmbd, A_inv_array, axes=([0], [0]))
+    S = np.sum(lmbd[:, None] * np.einsum('ijk,ik->ij', A_inv_array, xs), axis=0)
+    try:
+        m_lambda = np.linalg.solve(A_lambda_inv, S)
+    except np.linalg.LinAlgError:
+        print("Non PD!")
+        return 1e10  # Penalty for singularity
+    return m_lambda, S
 
 def compute_K_gradient(lmbd, xs, A_inv_array):
     """
@@ -70,6 +82,193 @@ def compute_K_gradient(lmbd, xs, A_inv_array):
     grad = -np.einsum('ij,ijk,ik->i', diff, A_inv_array, diff)
     return grad
 
+def compute_K_hessian(lmbd, xs, A_inv_array):
+    """
+    Naively computes the Hessian of K(λ) with entries:
+      H[i,j] = 2 * (m(λ)-x_i)^T A_inv_array[i] B A_inv_array[j] (m(λ)-x_j)
+    where:
+      - A_lambda_inv = sum_i λ_i A_inv_array[i],
+      - S = sum_i λ_i (A_inv_array[i] @ xs[i]),
+      - m(λ) is obtained by solving A_lambda_inv @ m = S, and
+      - B = inv(A_lambda_inv).
+
+    This implementation uses explicit Python loops for clarity.
+
+    Parameters:
+      lmbd: 1D NumPy array of convex coefficients (length k).
+      xs: NumPy array of centers with shape (k, d).
+      A_inv_array: NumPy array of shape (k, d, d) containing the inverses of A(x_i).
+
+    Returns:
+      Hessian: NumPy array of shape (k, k) with the Hessian entries.
+    """
+    k, d, _ = A_inv_array.shape
+
+    # Compute A_lambda_inv = sum_i λ_i A_inv_array[i]
+    A_lambda_inv = np.zeros((d, d))
+    for i in range(k):
+        A_lambda_inv += lmbd[i] * A_inv_array[i]
+
+    # Compute S = sum_i λ_i * (A_inv_array[i] @ xs[i])
+    S = np.zeros(d)
+    for i in range(k):
+        S += lmbd[i] * (A_inv_array[i] @ xs[i])
+
+    # Solve for m(λ)
+    try:
+        m_lambda = np.linalg.solve(A_lambda_inv, S)
+    except np.linalg.LinAlgError:
+        return np.zeros((k, k))
+
+    # Compute B = inv(A_lambda_inv)
+    B = np.linalg.inv(A_lambda_inv)
+
+    # Compute the Hessian using nested loops
+    H = np.zeros((k, k))
+    for i in range(k):
+        diff_i = xs[i] - m_lambda
+        u_i = A_inv_array[i] @ diff_i
+        for j in range(k):
+            diff_j = xs[j] - m_lambda
+            u_j = A_inv_array[j] @ diff_j
+            H[i, j] = 2 * (u_i.T @ (B @ u_j))
+    return H
+
+
+
+
+
+def compute_mean_curvature(lmbd, xs, A_inv_array):
+    """
+    Compute the mean curvature H at a boundary point b in the 3-simplex (k=3).
+
+    We treat K as a graph z = K(λ1, λ2) with λ3 = 1 - λ1 - λ2.
+    Partial derivatives of f(x,y) = K(x,y,1-x-y) are obtained by:
+        f_x = K_1 - K_3
+        f_y = K_2 - K_3
+    and second partials by:
+        f_xx = K_11 - 2 K_13 + K_33
+        f_yy = K_22 - 2 K_23 + K_33
+        f_xy = K_12 - K_13 - K_23 + K_33
+
+    Then the mean curvature of the graph at that point is:
+        H = [ (1 + f_y^2) f_xx
+              - 2 f_x f_y f_xy
+              + (1 + f_x^2) f_yy ]
+            / [2 (1 + f_x^2 + f_y^2)^(3/2)]
+
+    Parameters
+    ----------
+    lmbd : array_like, shape (3,)
+        Barycentric coordinates in the 3 simplex.
+    xs : array_like, shape (3, d)
+        Centers x_i in R^d.
+    A_inv_array : array_like, shape (3, d, d)
+        Inverses of the covariance matrices A(x_i).
+    compute_K_gradient : function
+        Signature grad = compute_K_gradient(lmbd, xs, A_inv_array)
+    compute_K_hessian : function
+        Signature H = compute_K_hessian(lmbd, xs, A_inv_array)
+
+    Returns
+    -------
+    H_mean : float
+        The mean curvature of the surface z = K at λ = lmbd.
+    """
+    # Gradient and Hessian of K in full (λ1,λ2,λ3)-space
+    g = compute_K_gradient(lmbd, xs, A_inv_array)
+    H = compute_K_hessian(lmbd, xs, A_inv_array)
+
+    # First derivatives of f(x,y)=K(x,y,1-x-y)
+    fx = g[0] - g[2]
+    fy = g[1] - g[2]
+
+    # Second derivatives of f
+    fxx = H[0, 0] - 2 * H[0, 2] + H[2, 2]
+    fyy = H[1, 1] - 2 * H[1, 2] + H[2, 2]
+    fxy = H[0, 1] - H[0, 2] - H[1, 2] + H[2, 2]
+
+    # Mean curvature formula for graph of f
+    denom = (1 + fx * fx + fy * fy) ** 1.5
+    H_mean = ((1 + fy * fy) * fxx
+              - 2 * fx * fy * fxy
+              + (1 + fx * fx) * fyy) / (2 * denom)
+
+    return H_mean
+
+
+def compute_kappa_max(lmbd, xs, A_inv_array):
+    """
+    Compute the maximum principal curvature kappa_max of the graph z = K at λ = lmbd
+    over the 2-simplex (k=3 case), using only gradient and Hessian of K in full λ-space.
+
+    Steps:
+      1. Get full gradient g = ∇K (length 3) and Hessian H (3x3) at lmbd.
+      2. Convert to partials of f(x,y)=K(x,y,1-x-y):
+         fx = K1 - K3
+         fy = K2 - K3
+         fxx = K11 - 2 K13 + K33
+         fyy = K22 - 2 K23 + K33
+         fxy = K12 - K13 - K23 + K33
+      3. Form first fundamental form a = I + [fx,fy]^T[fx,fy].
+      4. Form second fundamental form b = H_f / sqrt(1 + fx^2 + fy^2).
+      5. Compute shape operator W = a^{-1} @ b.
+      6. kappa_max = max eigenvalue of symmetric W.
+
+    Parameters
+    ----------
+    lmbd : array_like, shape (3,)
+        Barycentric coordinates in Δ^2.
+    xs : array_like, shape (3, d)
+        Centers x_i in R^d.
+    A_inv_array : array_like, shape (3, d, d)
+        Inverses A(x_i)^{-1}.
+    compute_K_gradient : function
+        gradient function: grad = compute_K_gradient(lmbd, xs, A_inv_array)
+    compute_K_hessian : function
+        Hessian function: H = compute_K_hessian(lmbd, xs, A_inv_array)
+
+    Returns
+    -------
+    kappa_max : float
+        The largest principal curvature at λ = lmbd.
+    """
+    # Full gradient and Hessian of K
+    g_full = compute_K_gradient(lmbd, xs, A_inv_array)  # shape (3,)
+    H_full = compute_K_hessian(lmbd, xs, A_inv_array)  # shape (3,3)
+
+    # Partial derivatives for f(x,y) = K(x,y,1-x-y)
+    fx = g_full[0] - g_full[2]
+    fy = g_full[1] - g_full[2]
+
+    fxx = H_full[0, 0] - 2 * H_full[0, 2] + H_full[2, 2]
+    fyy = H_full[1, 1] - 2 * H_full[1, 2] + H_full[2, 2]
+    fxy = H_full[0, 1] - H_full[0, 2] - H_full[1, 2] + H_full[2, 2]
+
+    # 2x2 Hessian for f
+    Hf = np.array([[fxx, fxy],
+                   [fxy, fyy]])
+
+    # First fundamental form a = I + grad(f)^T grad(f)
+    grad_f = np.array([fx, fy])
+    a = np.eye(2) + np.outer(grad_f, grad_f)
+
+    # Second fundamental form b = Hf / sqrt(1 + |grad_f|^2)
+    denom = np.sqrt(1 + fx * fx + fy * fy)
+    b = Hf / denom
+
+    # Compute shape operator W = a^{-1} @ b
+    a_inv = np.linalg.inv(a)
+    W = a_inv @ b
+
+    # Ensure symmetry
+    W_sym = (W + W.T) / 2.0
+
+    # Principal curvatures = eigenvalues of W_sym
+    eigvals = np.linalg.eigvalsh(W_sym)
+    kappa_max = np.max(eigvals)
+
+    return kappa_max
 
 def project_simplex(v):
     """
@@ -219,6 +418,82 @@ def minimize_K(eps, xs, A_list, A_inv_array, x_Ainv_x, solver="pga"):
     return {'lambda': opt_lmbd, 'K_min': res.fun, 'm_lambda': m_lambda,
             'A_lambda': A_lambda, 'success': res.success, 'message': res.message}
 
+def minimize_K_boundary(eps, xs, A_list, A_inv_array, x_Ainv_x):
+    """
+    Find the minimum of K(λ) = eps^2 - C(λ) over just the 1D edges of Δ^k.
+    Returns the best λ on any edge, its K-value, m(λ), A(λ), and solver info.
+    """
+    k, D = xs.shape
+    best = {
+        'K_min': np.inf,
+        'lambda': None,
+        'm_lambda': None,
+        'A_lambda': None,
+        'edge': None,
+        'success': False,
+        'message': ''
+    }
+
+    # helper to build λ from (i,j,t)
+    def make_lambda(i, j, t):
+        lam = np.zeros(k)
+        lam[i] = t
+        lam[j] = 1 - t
+        return lam
+
+    # objective along the edge (i,j)
+    def K_edge(t, i, j):
+        lam = make_lambda(i, j, t)
+        return compute_K(lam, eps, xs, A_inv_array, x_Ainv_x)
+
+    for i in range(k):
+        for j in range(i+1, k):
+            # minimize on t in [0,1]
+            res = minimize_scalar(
+                K_edge,
+                args=(i,j),
+                bounds=(0.0, 1.0),
+                method='bounded',
+                options={'xatol':1e-8}
+            )
+            if not res.success:
+                # you could log or warn here
+                pass
+
+            if res.fun < best['K_min']:
+                # reconstruct the best λ, m(λ) and A(λ)
+                t_opt  = res.x
+                lam_opt = make_lambda(i, j, t_opt)
+
+                # A(λ)^{-1} = sum λ_i A_i^{-1}
+                A_lam_inv = np.tensordot(lam_opt, A_inv_array, axes=(0,0))
+                # S = sum λ_i A_i^{-1} x_i
+                S = np.sum(
+                    lam_opt[:,None]
+                    * np.einsum('ijk,ik->ij', A_inv_array, xs),
+                    axis=0
+                )
+
+                # solve for m(λ)
+                try:
+                    m_opt = np.linalg.solve(A_lam_inv, S)
+                    A_opt = np.linalg.inv(A_lam_inv)
+                except np.linalg.LinAlgError:
+                    m_opt = None
+                    A_opt = None
+
+                best.update({
+                    'K_min':    res.fun,
+                    'lambda':   lam_opt,
+                    'm_lambda': m_opt,
+                    'A_lambda': A_opt,
+                    'edge':     (i,j),
+                    'success':  res.success,
+                    'message':  res.message
+                })
+
+    return best
+
 
 def parse_functions(func_str):
     """
@@ -356,28 +631,100 @@ def plot_curve_and_ellipses(fx, fy, points, A_matrices, A_inv_matrices, epsilon,
     return fig
 
 
-def plot_K_surface(K_func, lambda_grid, opt_pts):
+# def plot_K_surface(K_func, lambda_grid, opt_pts, b_star=None):
+#     """
+#
+#     :param K_func:
+#     :param lambda_grid:
+#     :param opt_pts:
+#     :return:
+#     """
+#     fig = plt.figure(figsize=(8, 6))
+#     ax = fig.add_subplot(111, projection='3d')
+#     ax.set_xlabel("λ1")
+#     ax.set_ylabel("λ2")
+#     ax.set_zlabel("K(λ)")
+#     ax.set_title("Surface Plot of K(λ) over Δ³")
+#     L1, L2 = np.meshgrid(lambda_grid, lambda_grid, indexing="ij")
+#     K_vals = np.array([[K_func(np.array([l1, l2, 1 - l1 - l2]))
+#                         if l1 + l2 <= 1 else np.nan for l2 in lambda_grid] for l1 in lambda_grid])
+#     ax.plot_surface(L1, L2, K_vals, cmap='inferno', edgecolor='none', alpha=0.2)
+#     for opt_pt in opt_pts:
+#         ax.scatter(opt_pt[0], opt_pt[1], opt_pt[2])
+#     zero_plane = np.zeros_like(K_vals)
+#     ax.plot_surface(L1, L2, zero_plane, color='gray', alpha=0.4, edgecolor='none')
+#     return fig
+def plot_K_surface(K_func, lambda_grid, opt_pts, b_star=None, num_t=200, elev=30, azim=135):
     """
-
-    :param K_func:
-    :param lambda_grid:
-    :param opt_pts:
-    :return:
+    :param K_func:      function taking a length‑3 array λ↦K(λ)
+    :param lambda_grid: 1D array of λ₁,λ₂ values for meshing the simplex
+    :param opt_pts:     list of optimizer points [ (λ1,λ2,λ3), ... ] to scatter
+    :param b_star:      optional length‑3 array [b1*, b2*, 0] defining boundary minimizer
+    :param num_t:       number of samples along t∈[0,1] for the red line
     """
     fig = plt.figure(figsize=(8, 6))
-    ax = fig.add_subplot(111, projection='3d')
-    ax.set_xlabel("λ1")
-    ax.set_ylabel("λ2")
-    ax.set_zlabel("K(λ)")
+    ax  = fig.add_subplot(111, projection='3d')
+    ax.set_xlabel(r'$\lambda_1$')
+    ax.set_ylabel(r'$\lambda_2$')
+    ax.set_zlabel(r'$K(\lambda)$')
     ax.set_title("Surface Plot of K(λ) over Δ³")
+    ax.view_init(elev=elev, azim=azim)
+    # --- surface over the simplex Δ²:
     L1, L2 = np.meshgrid(lambda_grid, lambda_grid, indexing="ij")
-    K_vals = np.array([[K_func(np.array([l1, l2, 1 - l1 - l2]))
-                        if l1 + l2 <= 1 else np.nan for l2 in lambda_grid] for l1 in lambda_grid])
-    ax.plot_surface(L1, L2, K_vals, cmap='inferno', edgecolor='none', alpha=0.2)
-    for opt_pt in opt_pts:
-        ax.scatter(opt_pt[0], opt_pt[1], opt_pt[2])
+    K_vals = np.array([
+        [ K_func(np.array([l1, l2, 1 - l1 - l2])) if l1 + l2 <= 1 else np.nan
+          for l2 in lambda_grid ]
+        for l1 in lambda_grid
+    ])
+    ax.plot_surface(L1, L2, K_vals,
+                    cmap='inferno', edgecolor='none', alpha=0.2)
+
+    # --- scatter any optima you already have:
+    color = "b"
+    for (l1, l2, l3) in opt_pts:
+
+        ax.scatter(l1, l2, l3, color=color, s=50)
+        color = "r"
+
+    # --- zero plane for reference:
     zero_plane = np.zeros_like(K_vals)
-    ax.plot_surface(L1, L2, zero_plane, color='gray', alpha=0.4, edgecolor='none')
+    ax.plot_surface(L1, L2, zero_plane,
+                    color='gray', alpha=0.4, edgecolor='none')
+
+    # --- now overlay the boundary‐to‐vertex curve if requested:
+    if b_star is not None:
+        t = np.linspace(0, 1, num_t)
+        if b_star[2]==0.:
+
+            # λ(t) = ((1-t)b1, (1-t)b2, t)
+            lambdas = np.vstack([
+                (1 - t) * b_star[0],
+                (1 - t) * b_star[1],
+                          t
+            ]).T
+            K_line = np.array([K_func(lam) for lam in lambdas])
+            ax.plot(lambdas[:,0], lambdas[:,1], K_line,
+                    color='crimson', linewidth=2, label=r'$f1(t)=K(\lambda(t))$')
+        elif b_star[1]==0.:
+            lambdas = np.vstack([
+                (1 - t) * b_star[0],
+                t,
+                (1 - t) * b_star[2],
+            ]).T
+            K_line = np.array([K_func(lam) for lam in lambdas])
+            ax.plot(lambdas[:, 0], lambdas[:, 1], K_line,
+                    color='crimson', linewidth=2, label=r'$f1(t)=K(\lambda(t))$')
+        elif b_star[0]==0.:
+            lambdas = np.vstack([
+                t,
+                (1 - t) * b_star[0],
+                (1 - t) * b_star[2],
+            ]).T
+            K_line = np.array([K_func(lam) for lam in lambdas])
+            ax.plot(lambdas[:, 0], lambdas[:, 1], K_line,
+                    color='crimson', linewidth=2, label=r'$f1(t)=K(\lambda(t))$')
+        ax.legend()
+
     return fig
 
 
@@ -421,6 +768,33 @@ def compute_precision_bounds(A_inv_list):
     return alpha, beta
 
 
+def inward_test(b_star, K_b, xs, A_inv, boundary_solver):
+    """
+    Return True if k(b*) > s^2 / (2 L_n) where
+       s  = inward directional derivative,
+       L_n = directional Hessian bound 2 (beta/alpha) delta^2.
+    """
+    # inward direction w = (-b1,-b2,1)
+    w = np.array([-b_star[0], -b_star[1], 1.0])
+    g = compute_K_gradient(b_star, xs, A_inv)          # length‑3 gradient
+
+    s  = max(0.0, -np.dot(g, w))                  # inward slope (non‑negative)
+    # Mahalanobis radius at b* (already stored from earlier code)
+    delta = np.max([
+        np.sqrt((xs[i] - boundary_solver['m_lambda']) @ A_inv[i] @ (xs[i] - boundary_solver['m_lambda']))
+        for i in range(3)
+    ])
+
+    alpha = min(np.linalg.eigvalsh(A_inv[i]).min() for i in range(3))
+    beta  = max(np.linalg.eigvalsh(A_inv[i]).max() for i in range(3))
+    L_n   = 2 * (beta / alpha) * delta**2
+
+    rhs = 0.5 * s**2 / L_n
+    return K_b > rhs, dict(s=s, L_n=L_n, rhs=rhs)
+
+
+
+
 # --- Streamlit UI ---
 
 st.title("Intersections of Ellipsoidal Balls & K(λ) Surface")
@@ -431,6 +805,9 @@ Now also testing the sufficient condition from Theorem 6."""
 )
 func_str = st.sidebar.text_input("Enter x(t), y(t)", "cos(t)*(1.5+1.4*cos(2*t)^2), sin(t)*(1.5+1.4*cos(2*t)^2)")
 solver = st.sidebar.radio("Solver", ["SLSQP", "cs", "pga"])
+# Sidebar sliders for view angles
+elev = st.sidebar.slider("Elevation angle", min_value=0, max_value=90, value=30)
+azim = st.sidebar.slider("Azimuth angle", min_value=0, max_value=360, value=135)
 fx, fy, t_sym = parse_functions(func_str)
 
 if fx is not None and fy is not None:
@@ -450,30 +827,62 @@ if fx is not None and fy is not None:
 
     # Minimize K(λ)
     result = minimize_K(epsilon, points, A_matrices, A_inv_array, x_Ainv_x, solver)
+    lambda_star = result["lambda"]
     m_lambda = result['m_lambda']
 
     # Plot the curve and ellipses as before.
     st.pyplot(plot_curve_and_ellipses(fx, fy, points, A_matrices, A_inv_list, epsilon, m_lambda))
 
+    # --- New: Test Theorem 6 condition ---
+    # 1. Compute K(b*) (minimum of K(λ) on the boundary)
+    # k_b_star = sample_boundary_K(K_func, num_samples=100)
+    boundary_solver = minimize_K_boundary(epsilon, points, A_matrices, A_inv_array, x_Ainv_x)
+    k_b_star = boundary_solver["K_min"]
+    b_star = boundary_solver["lambda"]
+    print(type(b_star))
+
     # Plot the K(λ) surface.
     lambda_grid = np.linspace(0, 1, 30)
     K_func = lambda lam: compute_K(lam, epsilon, points, A_inv_array, x_Ainv_x)
     opt1 = np.array([result['lambda'][0], result['lambda'][1], result['K_min']])
-    st.pyplot(plot_K_surface(K_func, lambda_grid, [opt1]))
+    opt2 = np.array([b_star[0], b_star[1], k_b_star])
+    st.pyplot(plot_K_surface(K_func, lambda_grid, [opt1, opt2], b_star=b_star, elev=elev, azim=azim))
+
+
 
     # Compute Mahalanobis distances → δ_max (here called alpha_star)
     djs = compute_mahalanobis_distances(m_lambda, points, A_inv_list)
     delta_max = float(np.max(djs))
 
-    # --- New: Test Theorem 6 condition ---
-    # 1. Compute b* (minimum of K(λ) on the boundary)
-    b_star = sample_boundary_K(K_func, num_samples=100)
     # 2. Compute curvature bounds (α and β) from the precision matrices
     alpha_bound, beta_bound = compute_precision_bounds(A_inv_list)
     # 3. For the standard simplex in R^3, the diameter D satisfies D^2 = 2.
     # Then the condition of Theorem 6 becomes: b_star > (beta/alpha)* (delta_max)^2.
     threshold = 2 * (beta_bound / alpha_bound) * (delta_max ** 2)
-    theorem6_holds = b_star > threshold
+    # First order threshold idea
+    strong_convex_const = 2 * alpha_bound ** 3
+    g = np.linalg.vector_norm(compute_K_gradient(b_star, points, A_inv_array))**2
+    threshold_2 = g/threshold
+    hessian_bstar = compute_K_hessian(b_star, points, A_inv_array)
+    threshold_3 = np.linalg.matrix_norm(hessian_bstar, ord=2)
+    threshold_4 = 2*compute_mean_curvature(b_star, points, A_inv_array)
+    threshold_5 = compute_kappa_max(b_star, points, A_inv_array)
+    theorem6_holds = k_b_star > threshold
+    theorem7_holds = k_b_star > threshold_2
+    theorem8_holds = k_b_star > threshold_3
+    theorem9_holds = k_b_star > threshold_4
+    theorem10_holds = k_b_star > threshold_5
+    theorem11_holds, dd = inward_test(b_star, k_b_star, points, A_inv_list, boundary_solver)
+    threshold_6 = dd["rhs"]
+    grad_star = compute_K_gradient(result["lambda"], points, A_inv_array)
+    print("K(b^*)")
+    print(k_b_star)
+    print("b^*")
+    print(b_star)
+    print("threshold_2")
+    print(threshold_2)
+    print("grad star")
+    print(grad_star)
 
     # --- Display results ---
     st.markdown(f"""
@@ -484,15 +893,27 @@ if fx is not None and fy is not None:
     - $\\epsilon^*$ (max Mahalanobis distance) = {delta_max:.3f}
 
     **Theorem 6 Check:**
-    - Minimum $K(\\lambda)$ on the boundary, $b^*$ = {b_star:.3f}
+    - Minimum $K(b^*)$ on the boundary, $K(b^*)$ = {k_b_star:.3f}
+    - Minimizer $b^*$ on the boundary, $b^*$ = {b_star}
     - Curvature threshold $(\\beta/\\alpha)\\delta^2$ = {threshold:.3f}
-    - **Condition:** $b^* > 2(\\beta/\\alpha)\\delta^2$ is **{"satisfied" if theorem6_holds else "not satisfied"}**.
-
+    - **Condition:** $K(b^*) > 2(\\beta/\\alpha)\\delta^2$ is **{"satisfied" if theorem6_holds else "not satisfied"}**.
     According to Theorem 6, if the condition holds then K(λ) > 0 for all λ ∈ Δ, and hence the ellipsoidal
     balls intersect.
     """)
 else:
     st.stop()
+
+
+# - First order threshold $|\\nabla K(b^*)|^2/(2m)$ = {threshold_2:.3f}
+# - Second order threshold $|\\nabla^2 K(b^*)|_{2}$ = {threshold_3:.3f}
+# - Curvature (2) threshold $2c(b^*)$ = {threshold_4:.3f}
+# - Max principle curvature threshold $\kappa_m(b^*)$ = {threshold_5:.3f}
+# - Geometry threshold $0.5s^2/L_n$ = {threshold_6:.3f}
+# - **Condition:** $K(b^*) >  |\\nabla K(b^*)|^2/(2m)$ is **{"satisfied" if theorem7_holds else "not satisfied"}**.
+# - **Condition:** $K(b^*) > \\lambda_{3}(\\nabla^2 K(b^*))$ is **{"satisfied" if theorem8_holds else "not satisfied"}**.
+# - **Condition:** $K(b^*) > 2c(b^*)$ is **{"satisfied" if theorem9_holds else "not satisfied"}**.
+# - **Condition:** $K(b^*) > \kappa_m(b^*)$ is **{"satisfied" if theorem10_holds else "not satisfied"}**.
+# - **Condition:** $K(b^*) > 0.5s^2/L_n$ is **{"satisfied" if theorem11_holds else "not satisfied"}**.
 
 # # --- Streamlit UI ---
 #

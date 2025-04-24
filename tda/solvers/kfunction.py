@@ -1,6 +1,5 @@
 """
     This module implements the function $K(\\lambda)$ from our paper.
-
 """
 import numpy as np
 import time
@@ -8,10 +7,13 @@ import time
 
 def get_A_operations(A_list, xs):
     """
+    Helper function to compute objects from the list of covariance matrices A(x_1), A(x_2), etc.... and the centers
+    x1, x2,...
 
     :param A_list: the list of covariance matrices evaluated at x_i
     :param xs: the tuple of centers x_i
-    :return:
+    :return: tuple (A_inv_array, x_Ainv_x) where A_inv_array is the array stacking A_inv(x_i) at each center
+    and an array of the quadratic forms q_i = x_i^T A_i^{-1} x_i
     """
     # Precompute each A_i^{-1} and x_i^T A_i^{-1} x_i.
     k, _ = xs.shape
@@ -28,6 +30,7 @@ def get_A_operations(A_list, xs):
 
 def compute_K(lmbd, eps, xs, A_inv_array, x_Ainv_x):
     """
+    TODO: rewrite this
     Computes K(λ) = eps^2 - C(λ), where
        A_lambda_inv = sum_i λ_i A_inv_array[i]
        S = sum_i λ_i (A_inv_array[i] @ xs[i])

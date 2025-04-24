@@ -333,15 +333,19 @@ class SDE:
 
 
 class SDEtorch:
-    def __init__(self, mu, sigma):
+    def __init__(self, mu, sigma, op=None, implicit_func=None, implicit_func_jacob=None):
         """
         A PyTorch-compatible SDE simulator.
 
         :param mu: function of (t, x) returning tensor of shape (d,)
         :param sigma: function of (t, x) returning tensor of shape (d, n)
+        :param op: optional function of x returning matrix (d,d) that is the orthogonal projection onto a tangent space
         """
         self.mu = mu
         self.sigma = sigma
+        self.op = op
+        self.implicit_func = implicit_func
+        self.implicit_func_jacob = implicit_func_jacob
 
     def solve(self, x0, tn, ntime=100, t0=0.0, seed=None, noise_dim=None, device=None, dtype=torch.float32):
         """
@@ -366,7 +370,7 @@ class SDEtorch:
 
         h = (tn - t0) / ntime
         x = torch.zeros((ntime + 1, d), dtype=dtype, device=device)
-        x[0] = x0
+        x[0, :] = x0
 
         if seed is not None:
             gen = torch.Generator(device=device).manual_seed(seed)
@@ -380,7 +384,16 @@ class SDEtorch:
             drift = self.mu(t_i, x[i])
             diffusion = self.sigma(t_i, x[i])  # shape (d, noise_dim)
             dB = torch.randn((noise_dim, 1), generator=gen, dtype=dtype, device=device) * torch.sqrt(torch.tensor(h, dtype=dtype, device=device))
-            x[i + 1] = x[i] + drift * h + torch.matmul(diffusion, dB).squeeze()
+            delta_x_i = drift * h + torch.matmul(diffusion, dB).squeeze()
+            if self.op is None and self.implicit_func is None:
+                x[i + 1] = x[i] + delta_x_i
+            elif self.op is not None:
+                # optionally orthogonally project the increment to the tangent space.
+                op = torch.tensor(self.op(x[i, :(d-1)].detach()), dtype=torch.float32, device=device).squeeze()
+                x[i + 1] = x[i] + op @ delta_x_i
+            elif self.implicit_func is not None and self.implicit_func_jacob is not None:
+                y = x[i] + delta_x_i
+                x[i+1] = self.euclidean_optimal_projection_to_manifold(y, 1)
         return x
 
     def sample_ensemble(self, x0, tn, ntime=100, npaths=5, t0=0.0, noise_dim=None, device=None, dtype=torch.float32):
@@ -407,6 +420,29 @@ class SDEtorch:
         for i in range(npaths):
             paths[i] = self.solve(x0, tn, ntime, t0, seed=None, noise_dim=noise_dim, device=device, dtype=dtype)
         return paths
+
+    # TODO: edit this to integrate it
+    def euclidean_optimal_projection_to_manifold(self, x0, n_iterations=1):
+        Df = self.implicit_func_jacob(*x0.detach())[0]
+        A = np.matmul(Df, Df.T)
+        # A = np.linalg.inv(A)
+        A = 1/A
+        # lambda1 = np.matmul(A, self.implicit_func(*x0.detach()))
+        lambda1 = A * self.implicit_func(*x0.detach())
+        # x0 = x0.detach()
+        for i in range(n_iterations):
+            # B = x0.detach() - np.matmul(Df.T, lambda1)
+            B = x0.detach() - Df.T*lambda1
+            B = B.reshape(2, )
+            print(x0.size())
+            print(B.shape)
+            A = np.matmul(self.implicit_func_jacob(*B)[0], Df.T)
+            # A = np.linalg.inv(A)
+            A = 1/A
+            # lambda1 += np.matmul(A, self.implicit_func(*B))
+            lambda1 += A*self.implicit_func(*B)
+        z = x0.detach() - Df.T*lambda1
+        return torch.tensor(z, dtype=torch.float32)
 
 
 

@@ -119,7 +119,7 @@ class ThreeStageFit:
         fit_model(model=ae_diffusion,
                   loss=diffusion_loss,
                   input_data=x,
-                  targets=encoded_cov,
+                  targets=encoded_cov, # TODO: we need to decide on using latent drift or ambient drift for the AE-SDE
                   lr=self.lr,
                   epochs=self.epochs_diffusion,
                   print_freq=self.print_freq,
@@ -132,7 +132,7 @@ class ThreeStageFit:
         fit_model(model=ae_diffusion,
                   loss=drift_loss,
                   input_data=x,
-                  targets=mu,
+                  targets=(mu, cov),
                   lr=self.lr,
                   epochs=self.epochs_drift,
                   print_freq=self.print_freq,

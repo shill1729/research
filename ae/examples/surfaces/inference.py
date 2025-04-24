@@ -13,15 +13,18 @@ print(os.getcwd())
 # Settings that remain constant
 show_geo = True
 show_stats = True
+# Orthogonally project the increment for the ambient model?
+project = False
 eps_grid_size = 10
 num_test = 20000
 h = 0.001
-n_paths = 100
+n_paths = 1000
 # Define a list of time horizons to test
-time_horizons = [0.5]
+time_horizons = [0.1]
+
 
 # Load the pre-trained model: note working directory is currently ae/experiments
-model_dir = "examples/surfaces/trained_models/Paraboloid/RiemannianBrownianMotion/trained_20250411-180507_h[16]_df[2]_dr[2]_lr0.001_epochs5000_not_annealed"
+model_dir = "examples/surfaces/trained_models/Paraboloid/RiemannianBrownianMotion/trained_20250423-005325_h[16]_df[16]_dr[16]_lr0.001_epochs9000_not_annealed"
 trainer = Trainer.load_from_pretrained(model_dir, device=device, large_dim=large_dim)
 trainer.models = {name:model.to(device) for name, model in trainer.models.items()}
 trainer.ambient_drift.to(device)
@@ -32,8 +35,8 @@ trainer.device = device
 print(trainer.toy_data.large_dim)
 trainer.toy_data.embedding_seed = embedding_seed
 geometry = GeometryError(trainer.toy_data, trainer, eps_max, device, show=show_geo, embed=embed)
-geometry.compute_and_plot_errors(eps_grid_size, num_test, None)
-geometry.plot_int_bd_surface(epsilon=eps_max)
+# geometry.compute_and_plot_errors(eps_grid_size, num_test, None)
+# geometry.plot_int_bd_surface(epsilon=eps_max)
 
 # Loop over each time horizon and run dynamics error analysis
 for tn in time_horizons:
@@ -47,7 +50,7 @@ for tn in time_horizons:
     print("Number of paths 1/h^2 =", 1 / h ** 2)
 
     # Dynamics errors
-    dynamics_error = DynamicsError(trainer.toy_data, trainer, tn, show=show_stats)
+    dynamics_error = DynamicsError(trainer.toy_data, trainer, tn, show=show_stats, project=project)
     gt, at, aes, gt_local, aes_local = dynamics_error.sample_path_generator.generate_paths(tn, n_time, n_paths, None, embed, large_dim)
 
     # Plot ambient sample paths (only if the number of paths is small enough)

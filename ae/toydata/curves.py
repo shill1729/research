@@ -54,7 +54,7 @@ class CurveBase(ABC):
 
 # Curves of the form (u, f(u))
 class Parabola(CurveBase):
-    def __init__(self, a=1.):
+    def __init__(self, a=2.):
         super().__init__()
         self.a = a
 
@@ -62,7 +62,30 @@ class Parabola(CurveBase):
         return sp.Matrix([self.u,  (self.u/self.a)**2])
 
     def bounds(self):
-        return [(-2., 2.)]
+        return [(-1., 1.)]
+
+class Cubic(CurveBase):
+    def __init__(self, a=2.):
+        super().__init__()
+        self.a = a
+
+    def equation(self):
+        return sp.Matrix([self.u,  (self.u/self.a)**3])
+
+    def bounds(self):
+        return [(-1., 1.)]
+
+class HalfEllipse(CurveBase):
+    def __init__(self, a=2., b =2.):
+        super().__init__()
+        self.a = a
+        self.b = b
+
+    def equation(self):
+        return sp.Matrix([self.u,  self.b*sp.sqrt(1-(self.u/self.a)**2)])
+
+    def bounds(self):
+        return [(-self.a, self.a)]
 
 
 class SineCurve(CurveBase):
@@ -147,6 +170,18 @@ class RationalCurve(CurveBase):
     def bounds(self):
         return [(-2, 2)]
 
+class BellCurve(CurveBase):
+    def __init__(self, a=1, b=1.):
+        super().__init__()
+        self.a = a
+        self.b = b
+
+    def equation(self):
+        f = sp.exp(-self.u**2/(2*self.b**2))/sp.sqrt(sp.pi*self.b**2)
+        return sp.Matrix([self.u, f])
+
+    def bounds(self):
+        return [(-1., 1.)]
 
 # Example of usage
 if __name__ == "__main__":

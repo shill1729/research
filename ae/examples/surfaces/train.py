@@ -7,6 +7,8 @@ from ae.experiments import Trainer
 from ae.toydata.local_dynamics import *
 from ae.toydata.surfaces import *
 
+# TODO: I recently switched back to ambient MSE's for the AE-SDEs. Make sure you are aware of this.
+#  TODO: try more neurons, training more
 device = torch.device("cpu")
 train_seed = None
 test_seed = None
@@ -25,23 +27,23 @@ if __name__ == "__main__":
 
     # torch.manual_seed(train_seed)
     # Point cloud parameters
-    num_points = 100
+    num_points = 30
     num_test = 20000
-    batch_size = num_points
+    batch_size = int(num_points/2)
     eps_grid_size = 10
     # The intrinsic and extrinsic dimensions.
     extrinsic_dim, intrinsic_dim = 3, 2
     hidden_dims = [16]
-    diffusion_layers = [2]
-    drift_layers = [2]
+    diffusion_layers = [16]
+    drift_layers = [16]
     lr = 0.001
-    weight_decay = 0.001
-    epochs_ae = 5000
-    epochs_diffusion = 5000
-    epochs_drift = 5000
+    weight_decay = 0.
+    epochs_ae = 9000
+    epochs_diffusion = 9000
+    epochs_drift = 9000
     print_freq = 1000
     # Diffeo weight for accumulative orders
-    diffeo_weight_12 = 0.15 # this is the separate diffeo_weight for just the First order and second order
+    diffeo_weight_12 = 0.2 # this is the separate diffeo_weight for just the First order and second order
     # First order weight: 0.08 was good
     tangent_angle_weight = 0.05
     # Second order weights accumulative

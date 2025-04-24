@@ -12,10 +12,10 @@ import torch
 
 
 class DynamicsError:
-    def __init__(self, toydata: ToyData, trainer: Trainer, tn: float, show=False):
+    def __init__(self, toydata: ToyData, trainer: Trainer, tn: float, show=False, project=False):
         self.toydata = toydata
         self.trainer = trainer
-        self.sample_path_generator = SamplePathGenerator(self.toydata, self.trainer)
+        self.sample_path_generator = SamplePathGenerator(self.toydata, self.trainer, project=project)
         self.sample_path_plotter = SamplePathPlotter(self.toydata, self.trainer, tn, show=show)
 
     @staticmethod
@@ -89,10 +89,13 @@ class DynamicsError:
         """
         return [
             ("l2 norm", lambda paths: torch.linalg.vector_norm(paths, axis=2, ord=2)),
-            ("polynomial", lambda paths: torch.tanh(paths[:, :, 2]**2-paths[:, :, 1]*paths[:, :, 0])),
-            ("cosine-poly", lambda paths: torch.cos(paths[:, :, 2]**2-paths[:, :, 1]**3)*paths[:, :, 0]),
-            ("sin(x1)x3", lambda paths: torch.sin(4*paths[:, :, 1])*paths[:, :, 2]),
-            ("rational function", lambda paths: paths[:, :, 2]/(1+paths[:, :, 1]**2+paths[:, :, 0]**2)),
+            ("xyz", lambda paths: paths[:, :, 0]*paths[:, :, 1]*paths[:, :, 2]),
+            ("x^2", lambda paths: paths[..., 0] ** 2),
+            ("x^3", lambda paths: paths[..., 0] ** 3),
+            ("y^2", lambda paths: paths[..., 1] ** 2),
+            ("y^3", lambda paths: paths[..., 1] ** 3),
+            ("z^2", lambda paths: paths[..., 2] ** 2),
+            ("z^3", lambda paths: paths[..., 2] ** 3),
             ("Manifold constraint", self.chart_error_vectorized),
             ("x1", lambda paths: paths[:, :, 0]),
             ("x2", lambda paths: paths[:, :, 1]),

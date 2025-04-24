@@ -2,7 +2,7 @@ import torch.nn as nn
 import torch
 import matplotlib.pyplot as plt
 
-from ae.sdes import SDE
+from ae.sdes import SDE, SDEtorch
 
 from ae.toydata.curves import *
 from ae.toydata.local_dynamics import *
@@ -11,55 +11,63 @@ from ae.utils import process_data
 from ae.models import AutoEncoder, LatentNeuralSDE, AutoEncoderDiffusion, fit_model, ThreeStageFit
 from ae.models import LossWeights, AmbientDriftNetwork, AmbientDiffusionNetwork
 from ae.models.losses import AmbientDriftLoss, AmbientDiffusionLoss
-
 # Model configuration parameters
 train_seed = None  # Set fixed seeds for reproducibility
 test_seed = None
 n_train = 30
 n_test = 2000
-batch_size = 25
+batch_size = 20
+model_grid = 90 # resolution for true vs model curves
+num_grid = 30  # grid resolution per axis
+
+# Architecture parameters
 intrinsic_dim = 1
 extrinsic_dim = 2
-epsilon = 0.2
+epsilon = 0.1
 hidden_dims = [32]
 drift_layers = [32]
 diff_layers = [32]
 
 # Training parameters
 lr = 0.001
-epochs_ae = 2
-epochs_diffusion = 2
-epochs_drift = 2
-weight_decay = 0.001
-print_freq = 1
-first_order_weight = 0.01
-second_order_weight = 0.005
+weight_decay = 0.
+# Training epochs
+epochs_ae = 9000
+epochs_diffusion = 9000
+epochs_drift = 9000
+print_freq = 1000
+# Penalty weights
 diffeo_weight = 0.1
+first_order_weight = 0.01
+second_order_weight = 0.01
 
 # Sample path input
-tn = 2.
-ntime = 500
-npaths = 500
+tn = 0.5
+ntime = 1000
+npaths = 1000
+project_the_ambient = False
 
 # Activation functions
 encoder_act = nn.Tanh()
 decoder_act = nn.Tanh()
-drift_act = nn.CELU()
-diffusion_act = nn.CELU()
+drift_act = nn.Tanh()
+diffusion_act = nn.Tanh()
 
 # ============================================================================
 # Generate data and train models
 # ============================================================================
 
 # Pick the manifold and dynamics
-curve = RationalCurve()
-dynamics = LangevinHarmonicOscillator()
+curve = Parabola()
+dynamics = RiemannianBrownianMotion()
 manifold = RiemannianManifold(curve.local_coords(), curve.equation())
 local_drift = dynamics.drift(manifold)
 local_diffusion = dynamics.diffusion(manifold)
 
 # Generate point cloud and process the data
 point_cloud = PointCloud(manifold, curve.bounds(), local_drift, local_diffusion, True)
+print("Extrinsic drift")
+print(point_cloud.extrinsic_drift)
 x, _, mu, cov, local_x = point_cloud.generate(n=n_train, seed=train_seed)
 x, mu, cov, p, n, h = process_data(x, mu, cov, d=intrinsic_dim)
 
@@ -88,13 +96,20 @@ ambient_drift_model = AmbientDriftNetwork(extrinsic_dim, extrinsic_dim, drift_la
 ambient_diff_model = AmbientDiffusionNetwork(extrinsic_dim, extrinsic_dim, diff_layers, diffusion_act)
 ambient_drift_loss = AmbientDriftLoss()
 ambient_diff_loss = AmbientDiffusionLoss()
+# TODO compute ambient losses for SDE coefficients
 
 print("Training ambient diffusion model")
 fit_model(ambient_diff_model, ambient_diff_loss, x, cov, lr, epochs_diffusion, print_freq, weight_decay, batch_size)
 print("\nTraining ambient drift model")  # Fixed typo: was "diffusion" instead of "drift"
 fit_model(ambient_drift_model, ambient_drift_loss, x, mu, lr, epochs_drift, print_freq, weight_decay, batch_size)
-ambient_sde = SDE(ambient_drift_model.drift_numpy, ambient_diff_model.diffusion_numpy)
-
+# Optionally project by passing the orthogonal projection or implicit function
+if not project_the_ambient:
+    ambient_sde = SDEtorch(ambient_drift_model.drift_torch, ambient_diff_model.diffusion_torch)
+else:
+    ambient_sde = SDEtorch(ambient_drift_model.drift_torch,
+                           ambient_diff_model.diffusion_torch,
+                           implicit_func=point_cloud.np_implicit_func,
+                           implicit_func_jacob=point_cloud.np_implicit_func_jacob)
 # ============================================================================
 # Model performance evaluation
 # ============================================================================
@@ -106,6 +121,10 @@ x_recon = aedf.autoencoder.decoder.forward(x_encoded)
 # Generate test data with expanded bounds
 train_bounds = curve.bounds()[0]
 large_bounds = [(train_bounds[0] - epsilon, train_bounds[1] + epsilon)]
+print("Training bounds:")
+print(train_bounds)
+print("Large bounds")
+print(large_bounds)
 point_cloud = PointCloud(manifold, large_bounds, local_drift, local_diffusion, True)
 x_test, _, mu_test, cov_test, local_x_test = point_cloud.generate(n=n_test, seed=test_seed)
 x_test, mu_test, cov_test, p_test, n_test, h_test = process_data(x_test, mu_test, cov_test, d=intrinsic_dim)
@@ -126,21 +145,26 @@ p_model_test = aedf.autoencoder.neural_orthogonal_projection(x_test_encoded).det
 tangent_space_test_mse = torch.mean(torch.linalg.matrix_norm(p_model_test - p_test, ord="fro") ** 2).detach().numpy()
 print("Tangent space MSE on test data = " + str(tangent_space_test_mse))
 
-model_grid = 90
+
 # Generate points along the manifold for visualization
 local_x_rng = np.linspace(large_bounds[0][0], large_bounds[0][1], model_grid)
 x_rng = np.zeros((model_grid, extrinsic_dim))
 for i in range(model_grid):
     x_rng[i, :] = point_cloud.np_phi(local_x_rng[i]).squeeze()
 x_rng = torch.tensor(x_rng, dtype=torch.float32)
+local_x_rng_tensor = torch.tensor(local_x_rng, dtype=torch.float32)
+# TODO: note the decoder u -> phi(u) stretches the x coordinate! from u to phi^1(u), of course!
+# We can either generate test data in a larger true latent space and encode/decoder it
 x_rng_encoded = aedf.autoencoder.encoder.forward(x_rng)
-x_rng_decoded = aedf.autoencoder.decoder.forward(x_rng_encoded)
+x_rng_decoded_amb = aedf.autoencoder.decoder.forward(x_rng_encoded)
+# OR just pass the enlarged local true data and see where it is decoded to
+x_rng_decoded = aedf.autoencoder.decoder.forward(local_x_rng_tensor.unsqueeze(-1))
 
 # Plot the test scatter plot against the model curve
 fig = plt.figure(figsize=(10, 6))
-plt.scatter(x_test[:, 0], x_test[:, 1], alpha=0.5, label='Test Data')
-plt.plot(x_rng_decoded[:, 0], x_rng_decoded[:, 1], c="red", linewidth=2, label='AE-SDE Manifold')
-plt.title('Test Data vs Learned Manifold')
+plt.plot(x_rng[:, 0], x_rng[:, 1], label='True manifold', c="blue", linewidth=2)
+plt.plot(x_rng_decoded[:, 0], x_rng_decoded[:, 1], c="red", linewidth=1, label='AE-SDE Manifold', alpha=0.8)
+plt.title('Decoding enlarged true latent space')
 plt.xlabel('X')
 plt.ylabel('Y')
 plt.legend()
@@ -149,12 +173,50 @@ plt.grid(True, linestyle='--', alpha=0.7)
 plt.savefig('curve_plots/manifold_reconstruction.png')
 plt.show()
 
+# # Plot the test scatter plot against the model curve
+# fig = plt.figure(figsize=(10, 6))
+# plt.plot(x_rng[:, 0], x_rng[:, 1], label='True manifold', c="blue", linewidth=2)
+# plt.plot(x_rng[:, 0], x_rng_decoded[:, 1], c="red", linewidth=1, label='AE-SDE Manifold', alpha=0.8)
+# plt.title('Plotting (u, phi^2(u)) for enlarged latent u')
+# plt.xlabel('X')
+# plt.ylabel('Y')
+# plt.legend()
+# plt.grid(True, linestyle='--', alpha=0.7)
+#
+# plt.savefig('curve_plots/manifold_reconstruction_2ndcoord.png')
+# plt.show()
+
+# Plot the test curve against the model curve
+fig = plt.figure(figsize=(10, 6))
+plt.plot(x_rng[:, 0], x_rng[:, 1], label='True manifold', c="blue", linewidth=2)
+plt.plot(x_rng_decoded_amb[:, 0], x_rng_decoded_amb[:, 1], c="red", linewidth=1, label='AE-SDE Manifold', alpha=0.8)
+plt.title('Reconstructing enlarged true ambient space')
+plt.xlabel('X')
+plt.ylabel('Y')
+plt.legend()
+plt.grid(True, linestyle='--', alpha=0.7)
+
+plt.savefig('curve_plots/ambient_manifold_reconstruction.png')
+plt.show()
+
+# # Check whether h o phi (z) = h(x)
+# fig = plt.figure(figsize=(10, 6))
+# plt.plot(np.exp(x_rng[:, 0]+x_rng[:, 1]**2), label='True manifold', c="blue", linewidth=2)
+# plt.plot(np.exp(x_rng_decoded_amb[:, 0]+x_rng_decoded_amb[:, 1]**2), c="red", linewidth=1, label='AE-SDE Manifold', alpha=0.8)
+# plt.title('Observable reconstruction true ambient space')
+# plt.xlabel('X')
+# plt.ylabel('Y')
+# plt.legend()
+# plt.grid(True, linestyle='--', alpha=0.7)
+# plt.savefig('curve_plots/ambient_manifold_reconstruction_observable.png')
+# plt.show()
+
 # ============================================================================
 # Sample Path Generation and Analysis
 # ============================================================================
 
 # Initialize for path generation
-x0 = x[0, :].detach().numpy()  # Starting point
+x0 = x[0, :]  # Starting point
 d = intrinsic_dim  # Intrinsic dimension
 time_grid = np.linspace(0, tn, ntime + 1)  # Time grid for path evolution
 
@@ -166,14 +228,19 @@ latent_paths = point_cloud.latent_sde.sample_ensemble(z0_true, tn, ntime, npaths
 for j in range(npaths):
     for i in range(ntime + 1):
         ambient_paths[j, i, :] = np.squeeze(point_cloud.np_phi(latent_paths[j, i, :]))
+ambient_paths = torch.from_numpy(ambient_paths)
 
 # 2. Generate AE-SDE Model paths
-z0 = x_encoded[0, :].detach().numpy()  # Encoded starting point
+z0 = x_encoded[0, :].detach() # Encoded starting point
 model_local_paths = aedf.latent_sde.sample_paths(z0, tn, ntime, npaths)
 model_ambient_paths = aedf.lift_sample_paths(model_local_paths)
-
+print(point_cloud.np_implicit_func_jacob(*[1, 1]))
+print(point_cloud.np_implicit_func_jacob(*[1, 1]))
 # 3. Generate Euclidean Ambient SDE model paths
 euclidean_model_paths = ambient_sde.sample_ensemble(x0, tn, ntime, npaths)
+
+# 4. Generate AE-SDE ambient paths DIRECTLY
+# model_direct_ambient_paths = aedf.direct_ambient_sample_paths(x0, tn, ntime, npaths)
 
 # ============================================================================
 # Trajectory Visualization
@@ -184,7 +251,10 @@ fig = plt.figure(figsize=(12, 8))
 for j in range(min(10, npaths)):  # Plot only a subset for clarity
     plt.plot(ambient_paths[j, :, 0], ambient_paths[j, :, 1], c="black", alpha=0.5)
     plt.plot(model_ambient_paths[j, :, 0], model_ambient_paths[j, :, 1], c="red", alpha=0.5)
-    plt.plot(euclidean_model_paths[j, :, 0], euclidean_model_paths[j, :, 1], c="blue", alpha=0.5)
+    # plt.plot(model_direct_ambient_paths[j, :, 0].detach(), model_direct_ambient_paths[j, :, 1].detach(), c="purple",
+    #          alpha=0.5)
+    plt.plot(euclidean_model_paths[j, :, 0].detach(), euclidean_model_paths[j, :, 1].detach(), c="blue", alpha=0.5)
+
 
 # Add the manifold for reference
 # plt.plot(x_rng_decoded[:, 0], x_rng_decoded[:, 1], c="green", linewidth=2)
@@ -192,66 +262,399 @@ for j in range(min(10, npaths)):  # Plot only a subset for clarity
 plt.title("Sample Path Trajectories Comparison")
 plt.xlabel("X")
 plt.ylabel("Y")
-plt.legend(["Ground Truth", "AE-SDE", "Euclidean SDE"])
+plt.legend(["Ground Truth", "AE-SDE", "AESDE-Ambient-Direct","Euclidean SDE"])
 plt.grid(True, linestyle='--', alpha=0.7)
 plt.savefig('curve_plots/trajectory_comparison.png')
 plt.show()
 
-# ============================================================================
-# Statistical Analysis of Model Performance
-# ============================================================================
+#=============================================================================
+# Comparison of drift vector fields in ambient space
+#=============================================================================
+# Define the domain [a,b]^2.
+a, b = large_bounds[0][0], large_bounds[0][1]  # you may change these values as needed
 
-# 1. Comparing Euclidean distance of means over time
-true_mean = np.mean(ambient_paths, axis=0)
-model_mean = np.mean(model_ambient_paths, axis=0)
-euclidean_model_mean = np.mean(euclidean_model_paths, axis=0)
 
-deviation_of_means_ae_sde = np.linalg.norm(model_mean - true_mean, axis=1)
-deviation_of_means_euclidean_model = np.linalg.norm(euclidean_model_mean - true_mean, axis=1)
+# Generate a uniform grid of points in [a, b]^2.
+x_vals = np.linspace(a, b, num_grid)
+y_vals = np.linspace(a, b, num_grid)
+X, Y = np.meshgrid(x_vals, y_vals)
+# Each point is a 2D coordinate (x, y)
+points = np.column_stack([X.ravel(), Y.ravel()])
+# True curve:
+true_curve = np.array([point_cloud.np_phi(x_vals[i]) for i in range(num_grid)]).squeeze()
+model_curve = aedf.autoencoder.decoder(torch.tensor(x_vals.reshape((num_grid, 1)), dtype=torch.float32)).detach()
+# -------------------------------------------------------------------
+# Compute the vector fields.
+# -------------------------------------------------------------------
 
-fig = plt.figure(figsize=(10, 6))
-plt.plot(time_grid, deviation_of_means_euclidean_model, c="blue", label="Euclidean SDE")
-plt.plot(time_grid, deviation_of_means_ae_sde, c="red", label="AE-SDE")
-plt.title("Deviation of Means: $\\|E(X_t)-E(\hat{X}_t)\\|_2$")
-plt.xlabel("Time")
-plt.ylabel("Euclidean Distance")
-plt.legend()
-plt.grid(True, linestyle='--', alpha=0.7)
-plt.savefig('curve_plots/mean_deviation.png')
+# 1. True Ambient Drift:
+# Note: point_cloud.np_extrinsic_drift is not vectorized and expects only the x-coordinate.
+# We compute it for each grid point separately.
+true_drift = np.array([point_cloud.np_extrinsic_drift(pt[0]) for pt in points])
+# each call returns a 2D vector.
+
+# 2. NN Ambient Drift: vectorized, so we call it directly on the (n,2) array.
+drift_nn = ambient_drift_model(torch.tensor(points, dtype=torch.float32)).detach().numpy()
+
+# 3. AE Ambient Drift: also vectorized.
+drift_ae = aedf.compute_ambient_drift(torch.tensor(points, dtype=torch.float32)).detach().numpy()
+
+print("Shape of drifts")
+print(true_drift.shape)
+print(drift_nn.shape)
+print(drift_ae.shape)
+
+# -------------------------------------------------------------------
+# Plotting the vector fields side by side.
+# -------------------------------------------------------------------
+print("xvals and curve shapes")
+print(x_vals.shape)
+print(true_curve.shape)
+print(model_curve.shape)
+# Create a figure with three subplots side by side.
+fig, axes = plt.subplots(1, 3, figsize=(18, 6))
+
+# True Ambient Drift Quiver Plot
+axes[0].quiver(X, Y,
+               true_drift[:, 0].reshape(X.shape),
+               true_drift[:, 1].reshape(Y.shape),
+               angles='xy', scale_units='xy', scale=1)
+axes[0].plot(true_curve[:, 0], true_curve[:, 1], c="blue")
+axes[0].plot(model_curve[:, 0], model_curve[:, 1], c="red")
+axes[0].set_title("True Ambient Drift")
+axes[0].set_xlim(a, b)
+axes[0].set_ylim(a, b)
+axes[0].set_xlabel("x")
+axes[0].set_ylabel("y")
+axes[0].set_aspect('equal')
+
+# NN Ambient Drift Quiver Plot
+axes[1].quiver(X, Y,
+               drift_nn[:, 0].reshape(X.shape),
+               drift_nn[:, 1].reshape(Y.shape),
+               angles='xy', scale_units='xy', scale=1)
+axes[1].plot(true_curve[:, 0], true_curve[:, 1], c="blue")
+axes[1].plot(model_curve[:, 0], model_curve[:, 1], c="red")
+axes[1].set_title("NN Ambient Drift")
+axes[1].set_xlim(a, b)
+axes[1].set_ylim(a, b)
+axes[1].set_xlabel("x")
+axes[1].set_ylabel("y")
+axes[1].set_aspect('equal')
+
+# AE Ambient Drift Quiver Plot
+axes[2].quiver(X, Y,
+               drift_ae[:, 0].reshape(X.shape),
+               drift_ae[:, 1].reshape(Y.shape),
+               angles='xy', scale_units='xy', scale=1)
+axes[2].plot(true_curve[:, 0], true_curve[:, 1], c="blue")
+axes[2].plot(model_curve[:, 0], model_curve[:, 1], c="red")
+axes[2].set_title("AE Ambient Drift")
+axes[2].set_xlim(a, b)
+axes[2].set_ylim(a, b)
+axes[2].set_xlabel("x")
+axes[2].set_ylabel("y")
+axes[2].set_aspect('equal')
+
+plt.tight_layout()
+plt.savefig('curve_plots/drift_fields.png')
 plt.show()
 
-# 2. Comparing average Euclidean distance between paths
-deviation_aesde = np.linalg.norm(ambient_paths - model_ambient_paths, axis=2)
-deviation_eucl = np.linalg.norm(ambient_paths - euclidean_model_paths, axis=2)
-mean_of_deviation_aesde = deviation_aesde.mean(axis=0)
-mean_of_deviation_eucl = deviation_eucl.mean(axis=0)
 
-fig = plt.figure(figsize=(10, 6))
-plt.plot(time_grid, mean_of_deviation_eucl, c="blue", label="Euclidean SDE")
-plt.plot(time_grid, mean_of_deviation_aesde, c="red", label="AE-SDE")
-plt.title("Mean of Path Deviations: $E\\|X_t-\hat{X}_t\\|_2$")
-plt.xlabel("Time")
-plt.ylabel("Average Euclidean Distance")
-plt.legend()
+#================================================================================
+# Checking the growth condition
+#================================================================================
+x_norm = np.linalg.vector_norm(points, axis=1, ord=2, keepdims=True)
+true_growth = np.linalg.vector_norm(true_drift, axis=1, ord=2)/(1+x_norm)
+true_growth = np.squeeze(true_growth)
+nn_growth = np.linalg.vector_norm(drift_nn, axis=1, ord=2)/(1+x_norm)[:, 0]
+ae_growth = np.linalg.vector_norm(drift_ae, axis=1, ord=2)/(1+x_norm)[:, 0]
+# Reshape the growth arrays to the grid shape (assuming points was built from X.ravel(), Y.ravel())
+print(X.shape)
+print(points.shape)
+print(true_growth.shape)
+print(nn_growth.shape)
+print(ae_growth.shape)
+true_growth_field = true_growth.reshape(X.shape)
+nn_growth_field   = nn_growth.reshape(X.shape)
+ae_growth_field   = ae_growth.reshape(X.shape)
+
+# Create a figure with three subplots side by side.
+fig, axes = plt.subplots(1, 3, figsize=(18, 6))
+
+# Plot True Drift Growth Ratio as a scalar field
+im0 = axes[0].imshow(true_growth_field, extent=(a, b, a, b), origin='lower', cmap='viridis')
+axes[0].plot(true_curve[:, 0], true_curve[:, 1], c="blue", label="True Curve")
+axes[0].plot(model_curve[:, 0], model_curve[:, 1], c="red", label="Model Curve")
+axes[0].set_title("True Drift Growth Ratio")
+axes[0].set_xlim(a, b)
+axes[0].set_ylim(a, b)
+axes[0].set_xlabel("x")
+axes[0].set_ylabel("y")
+axes[0].set_aspect('equal')
+fig.colorbar(im0, ax=axes[0], shrink=0.8)
+
+# Plot NN Drift Growth Ratio as a scalar field
+im1 = axes[1].imshow(nn_growth_field, extent=(a, b, a, b), origin='lower', cmap='viridis')
+axes[1].plot(true_curve[:, 0], true_curve[:, 1], c="blue", label="True Curve")
+axes[1].plot(model_curve[:, 0], model_curve[:, 1], c="red", label="Model Curve")
+axes[1].set_title("NN Drift Growth Ratio")
+axes[1].set_xlim(a, b)
+axes[1].set_ylim(a, b)
+axes[1].set_xlabel("x")
+axes[1].set_ylabel("y")
+axes[1].set_aspect('equal')
+fig.colorbar(im1, ax=axes[1], shrink=0.8)
+
+# Plot AE Drift Growth Ratio as a scalar field
+im2 = axes[2].imshow(ae_growth_field, extent=(a, b, a, b), origin='lower', cmap='viridis')
+axes[2].plot(true_curve[:, 0], true_curve[:, 1], c="blue", label="True Curve")
+axes[2].plot(model_curve[:, 0], model_curve[:, 1], c="red", label="Model Curve")
+axes[2].set_title("AE Drift Growth Ratio")
+axes[2].set_xlim(a, b)
+axes[2].set_ylim(a, b)
+axes[2].set_xlabel("x")
+axes[2].set_ylabel("y")
+axes[2].set_aspect('equal')
+fig.colorbar(im2, ax=axes[2], shrink=0.8)
+
+plt.tight_layout()
+plt.savefig('curve_plots/growth_ratio_grid.png')
+plt.show()
+
+# TODO: plot the growth ratio on just the manifold instead of the whole ambient space
+# Use the same number of samples as model_grid for consistency.
+u_vals = np.linspace(large_bounds[0][0], large_bounds[0][1], num_grid)
+
+# Compute the manifold points using your np_phi parameterization
+manifold_points = np.array([point_cloud.np_phi(u) for u in u_vals])  # shape: (n_points, extrinsic_dim)
+manifold_points_tensor = torch.tensor(manifold_points, dtype=torch.float32).squeeze(2)
+
+# Compute the drift vectors along the manifold:
+# For the true drift, note that point_cloud.np_extrinsic_drift expects a single x-coordinate.
+true_drift_manifold = np.array([point_cloud.np_extrinsic_drift(pt[0]) for pt in manifold_points])
+# For the NN and AE drifts, use the vectorized functions:
+print(manifold_points_tensor.size())
+drift_nn_manifold = ambient_drift_model(manifold_points_tensor).detach().numpy()
+drift_ae_manifold = aedf.compute_ambient_drift(manifold_points_tensor).detach().numpy()
+
+# Compute the norms of the manifold points for the denominator
+points_norm_manifold = np.linalg.vector_norm(manifold_points, axis=1, ord=2, keepdims=False)  # shape: (model_grid,)
+points_norm_manifold = points_norm_manifold.reshape(num_grid)
+print(points_norm_manifold.shape)
+# Compute the growth ratio along the manifold for each drift:
+print("shape of drift manifolds")
+true_drift_manifold = true_drift_manifold.reshape((num_grid, 2))
+print(true_drift_manifold.shape)
+print(drift_nn_manifold.shape)
+print(drift_ae_manifold.shape)
+
+true_growth_manifold = np.linalg.vector_norm(true_drift_manifold, axis=1, ord=2) / (1 + points_norm_manifold)
+nn_growth_manifold   = np.linalg.vector_norm(drift_nn_manifold, axis=1, ord=2)   / (1 + points_norm_manifold)
+ae_growth_manifold   = np.linalg.vector_norm(drift_ae_manifold, axis=1, ord=2)   / (1 + points_norm_manifold)
+
+print("Shape of drift growths on manifold")
+print(true_growth_manifold.shape)
+print(nn_growth_manifold.shape)
+print(ae_growth_manifold.shape)
+
+
+
+# Plot the growth ratios as curves with respect to the manifold parameter u:
+plt.figure(figsize=(10, 6))
+plt.plot(u_vals, true_growth_manifold, label='True Drift Growth', color='blue')
+plt.plot(u_vals, nn_growth_manifold, label='NN Drift Growth', color='green')
+plt.plot(u_vals, ae_growth_manifold, label='AE Drift Growth', color='red')
+plt.xlabel('Manifold Parameter u')
+plt.ylabel(r'$\|\mu(x(u))\|/(1+\|x(u)\|)$')
+plt.title('Growth Ratio along the Manifold')
 plt.grid(True, linestyle='--', alpha=0.7)
-plt.savefig('curve_plots/path_deviation.png')
+plt.legend()
+plt.tight_layout()
+plt.savefig('curve_plots/growth_ratio_curve.png')
 plt.show()
 
 
-# Compare variance
-var_of_deviation_aesde = deviation_aesde.var(axis=0, ddof=1)
-var_of_deviation_eucl = deviation_eucl.var(axis=0, ddof=1)
+#================================================================================
+# Checking the growth condition for the diffusion
+#================================================================================
+# 1. True Ambient Drift:
+# Note: point_cloud.np_extrinsic_drift is not vectorized and expects only the x-coordinate.
+# We compute it for each grid point separately.
+true_diffusion = np.array([point_cloud.np_extrinsic_diffusion(pt[0]) for pt in points])
+# each call returns a 2D vector.
 
-fig = plt.figure(figsize=(10, 6))
-plt.plot(time_grid, var_of_deviation_eucl, c="blue", label="Euclidean SDE")
-plt.plot(time_grid, var_of_deviation_aesde, c="red", label="AE-SDE")
-plt.title("Mean of Path Deviations: $Var\\|X_t-\hat{X}_t\\|_2$")
-plt.xlabel("Time")
-plt.ylabel("Variance of Euclidean Distance")
-plt.legend()
-plt.grid(True, linestyle='--', alpha=0.7)
-plt.savefig('curve_plots/path_var_deviation.png')
+# 2. NN Ambient Drift: vectorized, so we call it directly on the (n,2) array.
+diffusion_nn = ambient_diff_model(torch.tensor(points, dtype=torch.float32)).detach().numpy()
+
+# 3. AE Ambient Drift: also vectorized.
+diffusion_ae = aedf.compute_ambient_diffusion(torch.tensor(points, dtype=torch.float32)).detach().numpy()
+x_norm = np.linalg.vector_norm(points, axis=1, ord=2, keepdims=True)
+true_growth = np.linalg.matrix_norm(true_diffusion, ord=2)/(1+x_norm)[:,0]
+# true_growth = np.squeeze(true_growth)
+nn_growth = np.linalg.matrix_norm(diffusion_nn, ord=2)/(1+x_norm)[:, 0]
+ae_growth = np.linalg.matrix_norm(diffusion_ae, ord=2)/(1+x_norm)[:, 0]
+# Reshape the growth arrays to the grid shape (assuming points was built from X.ravel(), Y.ravel())
+print("Diffusion growth shapes")
+print(X.shape)
+print(points.shape)
+print(true_growth.shape)
+print(nn_growth.shape)
+print(ae_growth.shape)
+true_growth_field = true_growth.reshape(X.shape)
+nn_growth_field   = nn_growth.reshape(X.shape)
+ae_growth_field   = ae_growth.reshape(X.shape)
+
+# Create a figure with three subplots side by side.
+fig, axes = plt.subplots(1, 3, figsize=(18, 6))
+
+# Plot True Drift Growth Ratio as a scalar field
+im0 = axes[0].imshow(true_growth_field, extent=(a, b, a, b), origin='lower', cmap='viridis')
+axes[0].plot(true_curve[:, 0], true_curve[:, 1], c="blue", label="True Curve")
+axes[0].plot(model_curve[:, 0], model_curve[:, 1], c="red", label="Model Curve")
+axes[0].set_title("True Diffusion Growth Ratio")
+axes[0].set_xlim(a, b)
+axes[0].set_ylim(a, b)
+axes[0].set_xlabel("x")
+axes[0].set_ylabel("y")
+axes[0].set_aspect('equal')
+fig.colorbar(im0, ax=axes[0], shrink=0.8)
+
+# Plot NN Drift Growth Ratio as a scalar field
+im1 = axes[1].imshow(nn_growth_field, extent=(a, b, a, b), origin='lower', cmap='viridis')
+axes[1].plot(true_curve[:, 0], true_curve[:, 1], c="blue", label="True Curve")
+axes[1].plot(model_curve[:, 0], model_curve[:, 1], c="red", label="Model Curve")
+axes[1].set_title("NN Diffusion Growth Ratio")
+axes[1].set_xlim(a, b)
+axes[1].set_ylim(a, b)
+axes[1].set_xlabel("x")
+axes[1].set_ylabel("y")
+axes[1].set_aspect('equal')
+fig.colorbar(im1, ax=axes[1], shrink=0.8)
+
+# Plot AE Drift Growth Ratio as a scalar field
+im2 = axes[2].imshow(ae_growth_field, extent=(a, b, a, b), origin='lower', cmap='viridis')
+axes[2].plot(true_curve[:, 0], true_curve[:, 1], c="blue", label="True Curve")
+axes[2].plot(model_curve[:, 0], model_curve[:, 1], c="red", label="Model Curve")
+axes[2].set_title("AE Diffusion Growth Ratio")
+axes[2].set_xlim(a, b)
+axes[2].set_ylim(a, b)
+axes[2].set_xlabel("x")
+axes[2].set_ylabel("y")
+axes[2].set_aspect('equal')
+fig.colorbar(im2, ax=axes[2], shrink=0.8)
+
+plt.tight_layout()
+plt.savefig('curve_plots/growth_ratio_grid.png')
 plt.show()
+
+# TODO: plot the growth ratio on just the manifold instead of the whole ambient space
+# Use the same number of samples as model_grid for consistency.
+u_vals = np.linspace(large_bounds[0][0], large_bounds[0][1], num_grid)
+
+# Compute the manifold points using your np_phi parameterization
+manifold_points = np.array([point_cloud.np_phi(u) for u in u_vals])  # shape: (model_grid, extrinsic_dim)
+manifold_points_tensor = torch.tensor(manifold_points, dtype=torch.float32).squeeze(2)
+
+# Compute the drift vectors along the manifold:
+# For the true drift, note that point_cloud.np_extrinsic_drift expects a single x-coordinate.
+true_diff_manifold = np.array([point_cloud.np_extrinsic_diffusion(pt[0]) for pt in manifold_points])
+# For the NN and AE drifts, use the vectorized functions:
+print(manifold_points_tensor.size())
+diff_nn_manifold = ambient_diff_model(manifold_points_tensor).detach().numpy()
+diff_ae_manifold = aedf.compute_ambient_diffusion(manifold_points_tensor).detach().numpy()
+
+# Compute the norms of the manifold points for the denominator
+points_norm_manifold = np.linalg.vector_norm(manifold_points, axis=1, ord=2, keepdims=False)  # shape: (model_grid,)
+points_norm_manifold = points_norm_manifold.reshape(num_grid)
+print(points_norm_manifold.shape)
+# Compute the growth ratio along the manifold for each drift:
+print("shape of drift manifolds")
+true_drift_manifold = true_drift_manifold.reshape((num_grid, 2))
+print(true_diff_manifold.shape)
+print(diff_nn_manifold.shape)
+print(diff_ae_manifold.shape)
+
+true_growth_manifold = np.linalg.matrix_norm(true_diff_manifold.squeeze(axis=-1), ord=2) / (1 + points_norm_manifold)
+nn_growth_manifold   = np.linalg.matrix_norm(diff_nn_manifold, ord=2)   / (1 + points_norm_manifold)
+ae_growth_manifold   = np.linalg.matrix_norm(diff_ae_manifold, ord=2)   / (1 + points_norm_manifold)
+
+print("Shape of drift growths on manifold")
+print(true_growth_manifold.shape)
+print(nn_growth_manifold.shape)
+print(ae_growth_manifold.shape)
+
+
+
+# Plot the growth ratios as curves with respect to the manifold parameter u:
+plt.figure(figsize=(10, 6))
+plt.plot(u_vals, true_growth_manifold, label='True Diffusion Growth', color='blue')
+plt.plot(u_vals, nn_growth_manifold, label='NN Diffusion Growth', color='green')
+plt.plot(u_vals, ae_growth_manifold, label='AE Diffusion Growth', color='red')
+plt.xlabel('Manifold Parameter u')
+plt.ylabel(r'$\|\sigma(x(u))\|/(1+\|x(u)\|)$')
+plt.title('Growth Ratio along the Manifold')
+plt.grid(True, linestyle='--', alpha=0.7)
+plt.legend()
+plt.tight_layout()
+plt.savefig('curve_plots/growth_ratio_curve.png')
+plt.show()
+
+# # ============================================================================
+# # Pathwise Statistical Analysis of Model Performance
+# # ============================================================================
+#
+# # 1. Comparing Euclidean distance of means over time
+# true_mean = torch.mean(ambient_paths, dim=0)
+# model_mean = torch.mean(model_ambient_paths, dim=0)
+# euclidean_model_mean = torch.mean(euclidean_model_paths, dim=0)
+#
+# deviation_of_means_ae_sde = torch.linalg.norm(model_mean - true_mean, dim=1)
+# deviation_of_means_euclidean_model = torch.linalg.norm(euclidean_model_mean - true_mean, dim=1)
+#
+# fig = plt.figure(figsize=(10, 6))
+# plt.plot(time_grid, deviation_of_means_euclidean_model.detach(), c="blue", label="Euclidean SDE")
+# plt.plot(time_grid, deviation_of_means_ae_sde.detach(), c="red", label="AE-SDE")
+# plt.title("Deviation of Means: $\\|E(X_t)-E(\hat{X}_t)\\|_2$")
+# plt.xlabel("Time")
+# plt.ylabel("Euclidean Distance")
+# plt.legend()
+# plt.grid(True, linestyle='--', alpha=0.7)
+# plt.savefig('curve_plots/mean_deviation.png')
+# plt.show()
+#
+# # 2. Comparing average Euclidean distance between paths
+# deviation_aesde = torch.linalg.norm(ambient_paths - model_ambient_paths, dim=2)
+# deviation_eucl = torch.linalg.norm(ambient_paths - euclidean_model_paths, dim=2)
+# mean_of_deviation_aesde = deviation_aesde.mean(dim=0)
+# mean_of_deviation_eucl = deviation_eucl.mean(dim=0)
+#
+# fig = plt.figure(figsize=(10, 6))
+# plt.plot(time_grid, mean_of_deviation_eucl.detach(), c="blue", label="Euclidean SDE")
+# plt.plot(time_grid, mean_of_deviation_aesde.detach(), c="red", label="AE-SDE")
+# plt.title("Mean of Path Deviations: $E\\|X_t-\hat{X}_t\\|_2$")
+# plt.xlabel("Time")
+# plt.ylabel("Average Euclidean Distance")
+# plt.legend()
+# plt.grid(True, linestyle='--', alpha=0.7)
+# plt.savefig('curve_plots/path_deviation.png')
+# plt.show()
+#
+#
+# # Compare variance
+# var_of_deviation_aesde = deviation_aesde.var(dim=0)
+# var_of_deviation_eucl = deviation_eucl.var(dim=0)
+#
+# fig = plt.figure(figsize=(10, 6))
+# plt.plot(time_grid, var_of_deviation_eucl.detach(), c="blue", label="Euclidean SDE")
+# plt.plot(time_grid, var_of_deviation_aesde.detach(), c="red", label="AE-SDE")
+# plt.title("Mean of Path Deviations: $Var\\|X_t-\hat{X}_t\\|_2$")
+# plt.xlabel("Time")
+# plt.ylabel("Variance of Euclidean Distance")
+# plt.legend()
+# plt.grid(True, linestyle='--', alpha=0.7)
+# plt.savefig('curve_plots/path_var_deviation.png')
+# plt.show()
 
 
 # ============================================================================
@@ -262,7 +665,7 @@ def chart_error_vectorized(paths):
     Vectorized version of chart_error for ensemble paths
 
     Args:
-        paths (numpy.ndarray): Ensemble paths of shape (n_ensemble, n_time, n_dim)
+        paths (torch.Tensor): Ensemble paths of shape (n_ensemble, n_time, n_dim)
 
     Returns:
         numpy.ndarray: Error values of shape (n_ensemble, n_time)
@@ -277,8 +680,59 @@ def chart_error_vectorized(paths):
     # Compute errors for each point in the ensemble
     for i in range(n_ensemble):
         for t in range(n_time):
-            expected_z = point_cloud.np_phi(x_coords[i, t])[intrinsic_dim].squeeze()
-            errors[i, t] = np.abs(expected_z - y_coords[i, t])
+            expected_z = point_cloud.np_phi(x_coords[i, t].detach())[intrinsic_dim].squeeze()
+            errors[i, t] = np.abs(expected_z - y_coords[i, t].detach().numpy())
+    errors = torch.tensor(errors, dtype=torch.float32, device=paths.device)
+    return errors
+
+def chart_error_vectorized_sq_term(paths):
+    """
+    Vectorized version of chart_error for ensemble paths
+
+    Args:
+        paths (torch.Tensor): Ensemble paths of shape (n_ensemble, n_time, n_dim)
+
+    Returns:
+        numpy.ndarray: Error values of shape (n_ensemble, n_time)
+    """
+    # Extract individual coordinates for vectorized computation
+    x_coords = paths[:, :, 0]  # Shape: (n_ensemble, n_time)
+    y_coords = paths[:, :, 1]  # Shape: (n_ensemble, n_time)
+
+    n_ensemble, n_time = x_coords.shape
+    errors = np.zeros((n_ensemble, n_time))
+
+    # Compute errors for each point in the ensemble
+    for i in range(n_ensemble):
+        for t in range(n_time):
+            expected_z = point_cloud.np_phi(x_coords[i, t].detach())[intrinsic_dim].squeeze()
+            errors[i, t] = expected_z**2+y_coords[i, t].detach().numpy()**2
+    errors = torch.tensor(errors, dtype=torch.float32, device=paths.device)
+    return errors
+
+def chart_error_vectorized_cross_term(paths):
+    """
+    Vectorized version of chart_error for ensemble paths
+
+    Args:
+        paths (torch.Tensor): Ensemble paths of shape (n_ensemble, n_time, n_dim)
+
+    Returns:
+        numpy.ndarray: Error values of shape (n_ensemble, n_time)
+    """
+    # Extract individual coordinates for vectorized computation
+    x_coords = paths[:, :, 0]  # Shape: (n_ensemble, n_time)
+    y_coords = paths[:, :, 1]  # Shape: (n_ensemble, n_time)
+
+    n_ensemble, n_time = x_coords.shape
+    errors = np.zeros((n_ensemble, n_time))
+
+    # Compute errors for each point in the ensemble
+    for i in range(n_ensemble):
+        for t in range(n_time):
+            expected_z = point_cloud.np_phi(x_coords[i, t].detach())[intrinsic_dim].squeeze()
+            errors[i, t] = -2 * expected_z * y_coords[i, t].detach().numpy()
+    errors = torch.tensor(errors, dtype=torch.float32, device=paths.device)
     return errors
 
 
@@ -289,36 +743,48 @@ def test_functions(x):
     Returns a dictionary of function values.
     """
     results = {
-        'sin_x': np.sin(x[..., 0]),
-        'sin_y': np.sin(x[..., 1]),
-        'exp_neg_x2': np.exp(-x[..., 0] ** 2),
-        'tanh_xy': np.tanh(x[..., 0] * x[..., 1]),
-        'poly_x2y': x[..., 0] ** 2 * x[..., 1],
-        'log_1p_x2y2': np.log(1 + x[..., 0] ** 2 + x[..., 1] ** 2),
-        # 'manifold_constr': np.abs(np.sin(x[..., 0])-x[..., 1])
-        'manifold_constr': chart_error_vectorized(x)
+        'x^2': x[..., 0] ** 2/100,
+        'x^3': x[..., 0] ** 3/100,
+        'x^4': x[..., 0] ** 4/100,
+        'xy': x[..., 0]*x[..., 1]/100,
+        'x over (1+y)': x[..., 0]/(1+x[..., 1]**2)/100,
+        'arctan(y,x)': torch.atan2(x[..., 1], x[..., 0])/100,
+        'xy-x^3': x[..., 0]*x[..., 1]-x[..., 0]**3/100,
+        'log(1+x^2+y^2)': torch.log(1+x[..., 0] ** 2 + x[..., 1] ** 2)/100,
+        'x+y': (x[..., 0]+x[..., 1])/100,
+        'norm': torch.sqrt(x[..., 0]**2 + x[..., 1]**2)/100,
+        'sin(x)+sin(y)': (torch.sin(x[..., 0]) + torch.sin(x[..., 1]))/100,
+        'normal ext': 0.5 * (torch.sqrt(1+x[..., 0]**2)+ torch.arctanh(x[..., 0]/torch.sqrt(1+x[...,0]**2))),
+        'manifold_constr': chart_error_vectorized(x),
+        'manifold_constr sq': chart_error_vectorized(x)**2,
+        'manifold_constr sq term': chart_error_vectorized_sq_term(x),
+        'manifold_constr cross term': chart_error_vectorized_cross_term(x)
     }
     return results
 
 
 # Compute test function values for all three models
-gt_fk = test_functions(ambient_paths)
-aesde_fk = test_functions(model_ambient_paths)
-eucl_fk = test_functions(euclidean_model_paths)
+gt_fk = test_functions(ambient_paths.detach())
+aesde_fk = test_functions(model_ambient_paths.detach())
+# aesde_direct_fk = test_functions(model_direct_ambient_paths.detach())
+eucl_fk = test_functions(euclidean_model_paths.detach())
 
 # Compute mean values and errors
-gt_means = {k: v.mean(axis=0) for k, v in gt_fk.items()}
-aesde_means = {k: v.mean(axis=0) for k, v in aesde_fk.items()}
-eucl_means = {k: v.mean(axis=0) for k, v in eucl_fk.items()}
+gt_means = {k: v.mean(dim=0) for k, v in gt_fk.items()}
+aesde_means = {k: v.mean(dim=0) for k, v in aesde_fk.items()}
+# aesde_direct_means = {k: v.mean(dim=0) for k, v in aesde_direct_fk.items()}
+eucl_means = {k: v.mean(dim=0) for k, v in eucl_fk.items()}
 
-aesde_errors = {k: np.abs(gt_means[k] - aesde_means[k]) for k in gt_means}
-eucl_errors = {k: np.abs(gt_means[k] - eucl_means[k]) for k in gt_means}
+aesde_errors = {k: np.abs(gt_means[k].detach().numpy() - aesde_means[k].detach().numpy()) for k in gt_means}
+# aesde_direct_errors = {k: np.abs(gt_means[k].detach().numpy() - aesde_direct_means[k].detach().numpy()) for k in gt_means}
+eucl_errors = {k: np.abs(gt_means[k].detach().numpy() - eucl_means[k].detach().numpy()) for k in gt_means}
 
 # Create plots for each test function
 for func_name in gt_means.keys():
     fig = plt.figure(figsize=(10, 6))
     plt.plot(time_grid, eucl_errors[func_name], c="blue", label="Euclidean SDE")
     plt.plot(time_grid, aesde_errors[func_name], c="red", label="AE-SDE")
+    # plt.plot(time_grid, aesde_direct_errors[func_name], c="purple", label="AE-SDE Direct")
     plt.title(f"FK Error for {func_name}: $|E(f(X_t))-E(f(\hat{{X}}_t))|$")
     plt.xlabel("Time")
     plt.ylabel("Absolute Error")
@@ -443,9 +909,9 @@ np.random.seed(42)  # For reproducibility
 # Compute metrics for selected time points
 for i, t_idx in enumerate(time_indices):
     # Extract samples at this time point
-    gt_samples = ambient_paths[:, t_idx, :]
-    aesde_samples = model_ambient_paths[:, t_idx, :]
-    eucl_samples = euclidean_model_paths[:, t_idx, :]
+    gt_samples = ambient_paths[:, t_idx, :].detach()
+    aesde_samples = model_ambient_paths[:, t_idx, :].detach()
+    eucl_samples = euclidean_model_paths[:, t_idx, :].detach()
 
     # Add tiny noise to avoid perfect collinearity
     # gt_samples_noisy = gt_samples + noise_scale * np.random.randn(*gt_samples.shape)
@@ -505,8 +971,8 @@ for i, t_idx in enumerate(time_indices):
 fig, ax1 = plt.subplots(1, 1, figsize=(15, 6))
 
 # KL divergence plot
-ax1.plot(time_points, kl_eucl, 'bo-', label='Euclidean SDE')
-ax1.plot(time_points, kl_aesde, 'ro-', label='AE-SDE')
+ax1.plot(time_points[1:], kl_eucl[1:], 'bo-', label='Euclidean SDE')
+ax1.plot(time_points[1:], kl_aesde[1:], 'ro-', label='AE-SDE')
 ax1.set_title('KL Divergence from Ground Truth Over Time')
 ax1.set_xlabel('Time')
 ax1.set_ylabel('Estimated KL Divergence')

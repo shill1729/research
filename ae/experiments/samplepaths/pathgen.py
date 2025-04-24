@@ -11,7 +11,7 @@ from ae.sdes import SDE, SDEtorch
 from ae.utils import random_rotation_matrix, pad
 
 class SamplePathGenerator:
-    def __init__(self, toydata: ToyData, trainer: Trainer):
+    def __init__(self, toydata: ToyData, trainer: Trainer, project=False):
         """
 
         :param toydata:
@@ -21,7 +21,15 @@ class SamplePathGenerator:
         self.trainer = trainer
         # self.ambient_sde = SDE(self.trainer.ambient_drift.drift_numpy,
     #                            self.trainer.ambient_diffusion.diffusion_numpy)
-        self.ambient_sde = SDEtorch(self.trainer.ambient_drift.drift_torch, self.trainer.ambient_diffusion.diffusion_torch)
+        self.projected = project
+        if project:
+            self.ambient_sde = SDEtorch(self.trainer.ambient_drift.drift_torch,
+                                        self.trainer.ambient_diffusion.diffusion_torch,
+                                        op=self.toydata.point_cloud.np_orthogonal_proj)
+        else:
+            self.ambient_sde = SDEtorch(self.trainer.ambient_drift.drift_torch,
+                                        self.trainer.ambient_diffusion.diffusion_torch,
+                                        op=None)
         self.ground_truth_paths = None
         self.vanilla_ambient_paths = None
         self.ae_paths = None
@@ -118,6 +126,8 @@ class SamplePathGenerator:
             raise NotImplemented("Sampling from the boundary for embedded data is not implemented yet.")
         a = self.toydata.surface.bounds()[0][0] - 0.01
         b = self.toydata.surface.bounds()[0][1] + 0.01
+        a = 0.01
+        b = 0.01
         bd_x0 = self.toydata.point_cloud.np_phi(a, b).reshape((1, 3)).squeeze(0)
         return bd_x0
 

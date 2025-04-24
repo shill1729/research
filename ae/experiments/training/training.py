@@ -65,13 +65,13 @@ class Trainer:
                                            tangent_drift_weight=self.params["tangent_drift_weight"])
         print("Second order model")
         print(weights_second_order)
-        self.losses = {
+        self.ae_loss_weights = {
             "vanilla": weights_vanilla,
             "first": weights_first_order,
             "second": weights_second_order,
         }
-        self.diffusion_loss = LocalDiffusionLoss("fro")
-        self.drift_loss = LocalDriftLoss()
+        # self.diffusion_loss = LocalDiffusionLoss("fro")
+        # self.drift_loss = LocalDriftLoss()
 
     def train(self, anneal_weights=None):
         self.exp_dir = self._setup_experiment()
@@ -91,7 +91,7 @@ class Trainer:
                 anneal_weights_to_use = None
             else:
                 anneal_weights_to_use = anneal_weights
-            self.models[model_type] = fit3.three_stage_fit(model, self.losses[model_type],
+            self.models[model_type] = fit3.three_stage_fit(model, self.ae_loss_weights[model_type],
                                                            data["x"], data["mu"], data["cov"], data["p"],
                                                            data["orthonormal_frame"],
                                                            anneal_weights_to_use, self.params["norm"], self.device)
