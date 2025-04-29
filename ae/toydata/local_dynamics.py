@@ -77,18 +77,18 @@ class LangevinHarmonicOscillator(DynamicsBase):
         super().__init__()
         self.temperature = temperature
         self.inverse_temp = 1 / temperature
-        self.volatility = 0.1
+        self.volatility = 1.
 
     def drift(self, manifold: RiemannianManifold):
         # Define a potential based on the dimension
         if manifold.local_coordinates.shape[0] == 2:
             harmonic_potential = sp.Matrix([
-                self.u-1.5,
-                self.v-1.5
+                self.u - 1.,
+                self.v - 1.
             ])
         elif manifold.local_coordinates.shape[0] == 1:
             harmonic_potential = sp.Matrix([
-                self.u - 1.
+                self.u - 0.2
             ])
         else:
             raise NotImplementedError("Only intrinsic dimensions 2 and 1 are implemented")

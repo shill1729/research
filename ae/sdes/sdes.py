@@ -2,9 +2,14 @@
     A class implementation of a SDE using numpy.
 """
 from scipy.integrate import trapezoid
+from typing import Optional
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+
+
+# from ae.models import AutoEncoderDiffusion
+
 
 def plot_sample_path(t, x, ax: plt.Axes) -> None:
     """
@@ -333,7 +338,7 @@ class SDE:
 
 
 class SDEtorch:
-    def __init__(self, mu, sigma, op=None, implicit_func=None, implicit_func_jacob=None):
+    def __init__(self, mu, sigma, aedf = None, ae_proj=False, op=None, implicit_func=None, implicit_func_jacob=None):
         """
         A PyTorch-compatible SDE simulator.
 
@@ -346,6 +351,8 @@ class SDEtorch:
         self.op = op
         self.implicit_func = implicit_func
         self.implicit_func_jacob = implicit_func_jacob
+        self.aedf = aedf
+        self.ae_proj = ae_proj
 
     def solve(self, x0, tn, ntime=100, t0=0.0, seed=None, noise_dim=None, device=None, dtype=torch.float32):
         """
@@ -385,15 +392,20 @@ class SDEtorch:
             diffusion = self.sigma(t_i, x[i])  # shape (d, noise_dim)
             dB = torch.randn((noise_dim, 1), generator=gen, dtype=dtype, device=device) * torch.sqrt(torch.tensor(h, dtype=dtype, device=device))
             delta_x_i = drift * h + torch.matmul(diffusion, dB).squeeze()
-            if self.op is None and self.implicit_func is None:
+            if self.op is None and self.implicit_func is None and not self.ae_proj:
                 x[i + 1] = x[i] + delta_x_i
-            elif self.op is not None:
+            elif self.op is not None and not self.ae_proj:
                 # optionally orthogonally project the increment to the tangent space.
                 op = torch.tensor(self.op(x[i, :(d-1)].detach()), dtype=torch.float32, device=device).squeeze()
                 x[i + 1] = x[i] + op @ delta_x_i
-            elif self.implicit_func is not None and self.implicit_func_jacob is not None:
+            elif self.implicit_func is not None and self.implicit_func_jacob is not None and not self.ae_proj:
                 y = x[i] + delta_x_i
                 x[i+1] = self.euclidean_optimal_projection_to_manifold(y, 1)
+            elif self.ae_proj and self.aedf is not None:
+                y = x[i] + delta_x_i
+                encoded = self.aedf.autoencoder.encoder(y)
+                decoded = self.aedf.autoencoder.decoder(encoded).detach()
+                x[i + 1] = decoded
         return x
 
     def sample_ensemble(self, x0, tn, ntime=100, npaths=5, t0=0.0, noise_dim=None, device=None, dtype=torch.float32):
@@ -423,26 +435,46 @@ class SDEtorch:
 
     # TODO: edit this to integrate it
     def euclidean_optimal_projection_to_manifold(self, x0, n_iterations=1):
-        Df = self.implicit_func_jacob(*x0.detach())[0]
-        A = np.matmul(Df, Df.T)
-        # A = np.linalg.inv(A)
-        A = 1/A
-        # lambda1 = np.matmul(A, self.implicit_func(*x0.detach()))
-        lambda1 = A * self.implicit_func(*x0.detach())
-        # x0 = x0.detach()
-        for i in range(n_iterations):
-            # B = x0.detach() - np.matmul(Df.T, lambda1)
-            B = x0.detach() - Df.T*lambda1
-            B = B.reshape(2, )
-            print(x0.size())
-            print(B.shape)
-            A = np.matmul(self.implicit_func_jacob(*B)[0], Df.T)
+        if x0.size()[0] == 2:
+            Df = self.implicit_func_jacob(*x0.detach())[0]
+            A = np.matmul(Df, Df.T)
+            # A = np.linalg.inv(A)
+            A = 1 / A
+            # lambda1 = np.matmul(A, self.implicit_func(*x0.detach()))
+            lambda1 = A * self.implicit_func(*x0.detach())
+            # x0 = x0.detach()
+            for i in range(n_iterations):
+                # B = x0.detach() - np.matmul(Df.T, lambda1)
+                B = x0.detach() - Df.T * lambda1
+                B = B.reshape(2, )
+                A = np.matmul(self.implicit_func_jacob(*B)[0], Df.T)
+                # A = np.linalg.inv(A)
+                A = 1 / A
+                # lambda1 += np.matmul(A, self.implicit_func(*B))
+                lambda1 += A * self.implicit_func(*B)
+            z = x0.detach() - Df.T * lambda1
+        elif x0.size()[0] == 3:
+            Df = self.implicit_func_jacob(*x0.detach())[0]
+            A = np.matmul(Df, Df.T)
             # A = np.linalg.inv(A)
             A = 1/A
-            # lambda1 += np.matmul(A, self.implicit_func(*B))
-            lambda1 += A*self.implicit_func(*B)
-        z = x0.detach() - Df.T*lambda1
-        return torch.tensor(z, dtype=torch.float32)
+            # lambda1 = np.matmul(A, self.implicit_func(*x0.detach()))
+            lambda1 = A * self.implicit_func(*x0.detach())
+            # x0 = x0.detach()
+            for i in range(n_iterations):
+                # B = x0.detach() - np.matmul(Df.T, lambda1)
+                B = x0.detach() - Df.T * lambda1
+                B = B.reshape(3)
+                A = np.matmul(self.implicit_func_jacob(*B)[0], Df.T)
+                # A = np.linalg.inv(A)
+                A = 1 / A
+                # lambda1 += np.matmul(A, self.implicit_func(*B))
+                lambda1 += A * self.implicit_func(*B)
+            z = x0.detach() - Df.T * lambda1
+        else:
+            raise ValueError("Only hypersurfaces so far")
+        # z = torch.tensor(z, dtype=torch.float32, device=x0.device)
+        return z
 
 
 

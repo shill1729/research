@@ -6,7 +6,7 @@ from ae.sdes import SDE, SDEtorch
 
 from ae.toydata.curves import *
 from ae.toydata.local_dynamics import *
-from ae.toydata import RiemannianManifold, PointCloud
+from ae.toydata import RiemannianManifold, PointCloud, ProductSurface
 from ae.utils import process_data
 from ae.models import AutoEncoder, LatentNeuralSDE, AutoEncoderDiffusion, fit_model, ThreeStageFit
 from ae.models import LossWeights, AmbientDriftNetwork, AmbientDiffusionNetwork
@@ -24,9 +24,9 @@ num_grid = 30  # grid resolution per axis
 intrinsic_dim = 1
 extrinsic_dim = 2
 epsilon = 0.1
-hidden_dims = [32]
-drift_layers = [32]
-diff_layers = [32]
+hidden_dims = [16]
+drift_layers = [16]
+diff_layers = [16]
 
 # Training parameters
 lr = 0.001
@@ -37,15 +37,15 @@ epochs_diffusion = 9000
 epochs_drift = 9000
 print_freq = 1000
 # Penalty weights
-diffeo_weight = 0.1
-first_order_weight = 0.01
-second_order_weight = 0.01
+diffeo_weight = 0.2
+first_order_weight = 0.02
+second_order_weight = 0.02
 
 # Sample path input
 tn = 0.5
 ntime = 1000
 npaths = 1000
-project_the_ambient = False
+project_the_ambient = True
 
 # Activation functions
 encoder_act = nn.Tanh()
@@ -58,8 +58,8 @@ diffusion_act = nn.Tanh()
 # ============================================================================
 
 # Pick the manifold and dynamics
-curve = Parabola()
-dynamics = RiemannianBrownianMotion()
+curve = BellCurve()
+dynamics = LangevinHarmonicOscillator()
 manifold = RiemannianManifold(curve.local_coords(), curve.equation())
 local_drift = dynamics.drift(manifold)
 local_diffusion = dynamics.diffusion(manifold)
@@ -102,14 +102,15 @@ print("Training ambient diffusion model")
 fit_model(ambient_diff_model, ambient_diff_loss, x, cov, lr, epochs_diffusion, print_freq, weight_decay, batch_size)
 print("\nTraining ambient drift model")  # Fixed typo: was "diffusion" instead of "drift"
 fit_model(ambient_drift_model, ambient_drift_loss, x, mu, lr, epochs_drift, print_freq, weight_decay, batch_size)
+
+
 # Optionally project by passing the orthogonal projection or implicit function
 if not project_the_ambient:
     ambient_sde = SDEtorch(ambient_drift_model.drift_torch, ambient_diff_model.diffusion_torch)
 else:
     ambient_sde = SDEtorch(ambient_drift_model.drift_torch,
                            ambient_diff_model.diffusion_torch,
-                           implicit_func=point_cloud.np_implicit_func,
-                           implicit_func_jacob=point_cloud.np_implicit_func_jacob)
+                           aedf=aedf, ae_proj=True)
 # ============================================================================
 # Model performance evaluation
 # ============================================================================
@@ -234,10 +235,10 @@ ambient_paths = torch.from_numpy(ambient_paths)
 z0 = x_encoded[0, :].detach() # Encoded starting point
 model_local_paths = aedf.latent_sde.sample_paths(z0, tn, ntime, npaths)
 model_ambient_paths = aedf.lift_sample_paths(model_local_paths)
-print(point_cloud.np_implicit_func_jacob(*[1, 1]))
-print(point_cloud.np_implicit_func_jacob(*[1, 1]))
+
 # 3. Generate Euclidean Ambient SDE model paths
 euclidean_model_paths = ambient_sde.sample_ensemble(x0, tn, ntime, npaths)
+
 
 # 4. Generate AE-SDE ambient paths DIRECTLY
 # model_direct_ambient_paths = aedf.direct_ambient_sample_paths(x0, tn, ntime, npaths)
@@ -262,7 +263,7 @@ for j in range(min(10, npaths)):  # Plot only a subset for clarity
 plt.title("Sample Path Trajectories Comparison")
 plt.xlabel("X")
 plt.ylabel("Y")
-plt.legend(["Ground Truth", "AE-SDE", "AESDE-Ambient-Direct","Euclidean SDE"])
+plt.legend(["Ground Truth", "AE-SDE", "Euclidean-SDE"])
 plt.grid(True, linestyle='--', alpha=0.7)
 plt.savefig('curve_plots/trajectory_comparison.png')
 plt.show()
@@ -743,17 +744,17 @@ def test_functions(x):
     Returns a dictionary of function values.
     """
     results = {
-        'x^2': x[..., 0] ** 2/100,
-        'x^3': x[..., 0] ** 3/100,
-        'x^4': x[..., 0] ** 4/100,
-        'xy': x[..., 0]*x[..., 1]/100,
-        'x over (1+y)': x[..., 0]/(1+x[..., 1]**2)/100,
-        'arctan(y,x)': torch.atan2(x[..., 1], x[..., 0])/100,
-        'xy-x^3': x[..., 0]*x[..., 1]-x[..., 0]**3/100,
-        'log(1+x^2+y^2)': torch.log(1+x[..., 0] ** 2 + x[..., 1] ** 2)/100,
-        'x+y': (x[..., 0]+x[..., 1])/100,
-        'norm': torch.sqrt(x[..., 0]**2 + x[..., 1]**2)/100,
-        'sin(x)+sin(y)': (torch.sin(x[..., 0]) + torch.sin(x[..., 1]))/100,
+        'x^2': x[..., 0] ** 2,
+        'x^3': x[..., 0] ** 3,
+        'x^4': x[..., 0] ** 4,
+        'xy': x[..., 0]*x[..., 1],
+        'x over (1+y)': x[..., 0]/(1+x[..., 1]**2),
+        'arctan(y,x)': torch.atan2(x[..., 1], x[..., 0]),
+        'xy-x^3': x[..., 0]*x[..., 1]-x[..., 0]**3,
+        'log(1+x^2+y^2)': torch.log(1+x[..., 0] ** 2 + x[..., 1] ** 2),
+        'x+y': (x[..., 0]+x[..., 1]),
+        'norm': torch.sqrt(x[..., 0]**2 + x[..., 1]**2),
+        'sin(x)+sin(y)': (torch.sin(x[..., 0]) + torch.sin(x[..., 1])),
         'normal ext': 0.5 * (torch.sqrt(1+x[..., 0]**2)+ torch.arctanh(x[..., 0]/torch.sqrt(1+x[...,0]**2))),
         'manifold_constr': chart_error_vectorized(x),
         'manifold_constr sq': chart_error_vectorized(x)**2,
@@ -779,19 +780,59 @@ aesde_errors = {k: np.abs(gt_means[k].detach().numpy() - aesde_means[k].detach()
 # aesde_direct_errors = {k: np.abs(gt_means[k].detach().numpy() - aesde_direct_means[k].detach().numpy()) for k in gt_means}
 eucl_errors = {k: np.abs(gt_means[k].detach().numpy() - eucl_means[k].detach().numpy()) for k in gt_means}
 
+# Relative errors of FK statistics:
+# Relative errors with small epsilon for stability
+rel_stability = 10**-9
+aesde_rel_errors = {
+    k: np.abs(gt_means[k].detach().numpy() - aesde_means[k].detach().numpy()) /
+       (np.abs(gt_means[k].detach().numpy()) + rel_stability)
+    for k in gt_means
+}
+eucl_rel_errors = {
+    k: np.abs(gt_means[k].detach().numpy() - eucl_means[k].detach().numpy()) /
+       (np.abs(gt_means[k].detach().numpy()) + rel_stability)
+    for k in gt_means
+}
+
+
 # Create plots for each test function
+# for func_name in gt_means.keys():
+#     fig = plt.figure(figsize=(10, 6))
+#     plt.plot(time_grid, eucl_errors[func_name], c="blue", label="Euclidean SDE")
+#     plt.plot(time_grid, aesde_errors[func_name], c="red", label="AE-SDE")
+#     # plt.plot(time_grid, aesde_direct_errors[func_name], c="purple", label="AE-SDE Direct")
+#     plt.title(f"FK Error for {func_name}: $|E(f(X_t))-E(f(\hat{{X}}_t))|$")
+#     plt.xlabel("Time")
+#     plt.ylabel("Absolute Error")
+#     plt.legend()
+#     plt.grid(True, linestyle='--', alpha=0.7)
+#     plt.savefig(f'curve_plots/fk_error_{func_name}.png')
+#     plt.show()
 for func_name in gt_means.keys():
-    fig = plt.figure(figsize=(10, 6))
-    plt.plot(time_grid, eucl_errors[func_name], c="blue", label="Euclidean SDE")
-    plt.plot(time_grid, aesde_errors[func_name], c="red", label="AE-SDE")
-    # plt.plot(time_grid, aesde_direct_errors[func_name], c="purple", label="AE-SDE Direct")
-    plt.title(f"FK Error for {func_name}: $|E(f(X_t))-E(f(\hat{{X}}_t))|$")
-    plt.xlabel("Time")
-    plt.ylabel("Absolute Error")
-    plt.legend()
-    plt.grid(True, linestyle='--', alpha=0.7)
-    plt.savefig(f'curve_plots/fk_error_{func_name}.png')
+    fig, axes = plt.subplots(1, 2, figsize=(16, 5))
+
+    # Plot absolute error
+    axes[0].plot(time_grid, eucl_errors[func_name], c="blue", label="Euclidean SDE")
+    axes[0].plot(time_grid, aesde_errors[func_name], c="red", label="AE-SDE")
+    axes[0].set_title(f"FK Absolute Error for {func_name}")
+    axes[0].set_xlabel("Time")
+    axes[0].set_ylabel("Absolute Error")
+    axes[0].legend()
+    axes[0].grid(True, linestyle='--', alpha=0.7)
+
+    # Plot relative error
+    axes[1].plot(time_grid, eucl_rel_errors[func_name], c="blue", label="Euclidean SDE")
+    axes[1].plot(time_grid, aesde_rel_errors[func_name], c="red", label="AE-SDE")
+    axes[1].set_title(f"FK Relative Error for {func_name}")
+    axes[1].set_xlabel("Time")
+    axes[1].set_ylabel("Relative Error")
+    axes[1].legend()
+    axes[1].grid(True, linestyle='--', alpha=0.7)
+
+    plt.tight_layout()
+    plt.savefig(f'curve_plots/fk_abs_rel_error_{func_name}.png')
     plt.show()
+
 
 # ============================================================================
 # Distribution Comparison Analysis

@@ -13,7 +13,7 @@ from ae.toydata.surfaces import Sphere
 from ae.utils import compute_orthogonal_projection_from_cov
 
 
-def generate_point_cloud_and_As(n, seed=17):
+def generate_point_cloud_and_pd_matrices(n, seed=17):
     """
     Generate a Riemannian point cloud of n points and compute the corresponding covariance A matrices.
 

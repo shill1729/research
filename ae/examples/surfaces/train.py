@@ -33,9 +33,9 @@ if __name__ == "__main__":
     eps_grid_size = 10
     # The intrinsic and extrinsic dimensions.
     extrinsic_dim, intrinsic_dim = 3, 2
-    hidden_dims = [16]
-    diffusion_layers = [16]
-    drift_layers = [16]
+    hidden_dims = [32]
+    diffusion_layers = [32]
+    drift_layers = [32]
     lr = 0.001
     weight_decay = 0.
     epochs_ae = 9000
@@ -45,12 +45,12 @@ if __name__ == "__main__":
     # Diffeo weight for accumulative orders
     diffeo_weight_12 = 0.2 # this is the separate diffeo_weight for just the First order and second order
     # First order weight: 0.08 was good
-    tangent_angle_weight = 0.05
+    tangent_angle_weight = 0.01
     # Second order weights accumulative
-    tangent_angle_weight2 = 0.05  # the first order weight for the second order model, if accumulating penalties
-    tangent_drift_weight = 0.05
-    surface = Paraboloid()
-    dynamics = RiemannianBrownianMotion()
+    tangent_angle_weight2 = 0.02 # the first order weight for the second order model, if accumulating penalties
+    tangent_drift_weight = 0.02
+    surface = RationalSurface()
+    dynamics = LangevinHarmonicOscillator()
     if embed:
         extrinsic_dim = large_dim
 

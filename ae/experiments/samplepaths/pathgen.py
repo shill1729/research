@@ -22,14 +22,15 @@ class SamplePathGenerator:
         # self.ambient_sde = SDE(self.trainer.ambient_drift.drift_numpy,
     #                            self.trainer.ambient_diffusion.diffusion_numpy)
         self.projected = project
-        if project:
+        if self.projected:
             self.ambient_sde = SDEtorch(self.trainer.ambient_drift.drift_torch,
                                         self.trainer.ambient_diffusion.diffusion_torch,
-                                        op=self.toydata.point_cloud.np_orthogonal_proj)
+                                        aedf=self.trainer.models["vanilla"],
+                                        ae_proj=True)
         else:
             self.ambient_sde = SDEtorch(self.trainer.ambient_drift.drift_torch,
                                         self.trainer.ambient_diffusion.diffusion_torch,
-                                        op=None)
+                                        )
         self.ground_truth_paths = None
         self.vanilla_ambient_paths = None
         self.ae_paths = None

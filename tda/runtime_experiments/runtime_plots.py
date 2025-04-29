@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from tda.solvers.scipy_solver import minimize_K
 from tda.solvers.pgd import projected_gradient_descent
 from tda.solvers.cauchy_simplex_solver import cauchy_simplex_solver
-from tda.toydata.pointclouds import generate_point_cloud_and_As
+from tda.toydata.pointclouds import generate_point_cloud_and_pd_matrices
 
 
 def time_intersection_tests(n, eps=0.5, solver="SLSQP"):
@@ -19,7 +19,7 @@ def time_intersection_tests(n, eps=0.5, solver="SLSQP"):
       pair_count: number of pairs tested.
       triple_count: number of triples tested.
     """
-    x, A_list = generate_point_cloud_and_As(n)
+    x, A_list = generate_point_cloud_and_pd_matrices(n)
 
     # --- Time pairs ---
     pair_count = 0

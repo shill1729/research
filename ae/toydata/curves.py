@@ -65,7 +65,7 @@ class Parabola(CurveBase):
         return [(-1., 1.)]
 
 class Cubic(CurveBase):
-    def __init__(self, a=2.):
+    def __init__(self, a=1.05):
         super().__init__()
         self.a = a
 
