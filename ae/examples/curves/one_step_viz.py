@@ -7,6 +7,7 @@ Visualize one step or entire sample paths of Euler-Maruyama for
 
 """
 import matplotlib.pyplot as plt
+import seaborn as sns
 
 from ae.toydata.curves import *
 from ae.toydata.local_dynamics import *
@@ -14,8 +15,8 @@ from ae.toydata import RiemannianManifold, PointCloud
 from ae.utils import process_data
 
 n_train = 3
-train_seed = 17
-path_seed = 17
+train_seed = None
+path_seed = None
 
 # Manifold parameters: dimensions and boundary
 intrinsic_dim = 1
@@ -26,6 +27,7 @@ space_grid_size = 30
 # Sample path input
 tn = 0.02
 ntime = 1
+n_ensemble = 200
 h = tn / ntime
 time_grid = np.linspace(0, tn, ntime+1)
 # ============================================================================
@@ -102,16 +104,17 @@ local_coord_grid = np.linspace(-1, 1, space_grid_size)
 for i in range(space_grid_size):
     curve_grid[i] = point_cloud.np_phi(local_coord_grid[i]).squeeze()
 
+print("Initial point x_0:")
 print(local_gt_lifted[0, :])
 print(ambient_gt[0, :])
 print(ambient_gt_path_recon[0, :])
 print(ambient_gt_step_recon[0, :])
 
 fig = plt.figure()
-ax = plt.subplot(121)
-ax.plot(time_grid, local_gt, label="Local EM")
-ax.legend()
-ax = plt.subplot(122)
+# ax = plt.subplot(121)
+# ax.plot(time_grid, local_gt, label="Local EM")
+# ax.legend()
+ax = plt.subplot(111)
 ax.plot(local_coord_grid, curve_grid[:, 1], label="manifold")
 ax.plot(local_gt_lifted[:, 0], local_gt_lifted[:, 1], label="Local EM, Lifted", alpha = 0.5)
 ax.plot(ambient_gt[:, 0], ambient_gt[:, 1], label="Ambient EM", alpha=0.5)
@@ -146,5 +149,87 @@ ax.scatter(ambient_gt_step_recon[-1, 0], ambient_gt_step_recon[-1, 1],
 ax.legend()
 plt.show()
 
+# Distribution analysis:
+
+
+# ============================================================================
+# Ensemble Simulation for Terminal Point Distributions
+# ============================================================================
+terminal_points = {
+    "Lifted Local": [],
+    "Ambient": [],
+    "Post-recon": [],
+    "Step-recon": [],
+}
+
+for i in range(n_ensemble):
+    # Regenerate drift
+    local_path = np.zeros((ntime + 1, intrinsic_dim))
+    local_path[0, :] = z0
+
+    ambient_path = np.zeros((ntime + 1, extrinsic_dim))
+    ambient_path[0, :] = x0
+
+    path_recon = np.zeros((ntime + 1, extrinsic_dim))
+    path_recon[0, :] = x0
+
+    step_recon = np.zeros((ntime + 1, extrinsic_dim))
+    step_recon[0, :] = x0
+
+    # Simulate with new randomness
+    db = np.random.normal(scale=np.sqrt(h), size=(intrinsic_dim, 1))
+    local_path[1, :] = local_path[0, :] + h * local_drift(local_path[0, :]) + (local_diffusion(local_path[0, :]) @ db).reshape(intrinsic_dim)
+    ambient_path[1, :] = ambient_path[0, :] + h * extrinsic_drift(ambient_path[0, :]) + (extrinsic_diffusion(ambient_path[0, :]) @ db).reshape(extrinsic_dim)
+
+    path_recon[1, :] = point_cloud.np_phi(ambient_path[1, 0]).squeeze()
+    em_step = ambient_path[0, :] + h * extrinsic_drift(ambient_path[0, :]) + (extrinsic_diffusion(ambient_path[0, :]) @ db).reshape(extrinsic_dim)
+    step_recon[1, :] = point_cloud.np_phi(em_step[0]).squeeze()
+
+    # Lift local path
+    lifted_local = point_cloud.np_phi(local_path[1, :]).squeeze()
+
+    # Store terminal points
+    terminal_points["Lifted Local"].append(lifted_local)
+    terminal_points["Ambient"].append(ambient_path[1, :])
+    terminal_points["Post-recon"].append(path_recon[1, :])
+    terminal_points["Step-recon"].append(step_recon[1, :])
+
+# Stack results into arrays
+for key in terminal_points:
+    terminal_points[key] = np.stack(terminal_points[key], axis=0)  # shape: (n_ensemble, extrinsic_dim)
+
+# ============================================================================
+# Plotting terminal point distributions
+# ============================================================================
+fig, axes = plt.subplots(1, extrinsic_dim, figsize=(12, 4))
+colors = {
+    "Lifted Local": 'black',
+    "Ambient": 'green',
+    "Post-recon": 'purple',
+    "Step-recon": 'orange',
+}
+linestyles = {
+    "Lifted Local": '-',
+    "Ambient": '--',
+    "Post-recon": '-.',
+    "Step-recon": ':',
+}
+
+for i in range(extrinsic_dim):
+    ax = axes[i]
+    for method in terminal_points:
+        sns.kdeplot(
+            terminal_points[method][:, i],
+            ax=ax,
+            label=fr"$x_h^{{({i+1})}}$, {method}",
+            color=colors[method],
+            linestyle=linestyles[method],
+            fill=False
+        )
+    ax.set_title(f"Distribution of $x_h^{i+1}$")
+    ax.legend()
+
+plt.tight_layout()
+plt.show()
 
 
