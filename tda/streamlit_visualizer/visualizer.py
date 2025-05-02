@@ -1,7 +1,7 @@
 """
 Ellipsoidal Ball Intersection via Convex Optimization of K(λ)
 
-This module implements the formulas for K and optimization-based method for testing
+This module implements the formulas for K and optimization-based method for testing for the
 intersection of ellipsoidal balls in ℝ^D, as developed in the accompanying paper write-up.
 
 Given a finite set of points x₁, ..., x_k ∈ ℝ^D and associated positive-definite matrices
@@ -12,7 +12,7 @@ weighted average of squared Mahalanobis distances and admits closed-form express
 its value, gradient, and Hessian, although the Hessian is not used below explicitly.
 
 This code includes:
-- Computation of K(λ), its gradient, and curvature-based bounds
+- Computation of K(λ), its gradient, and curvature-based bounds for a conjecture.
 - Solvers (projected gradient descent and constrained minimization) for minimizing K
 - Plotting utilities to visualize ellipsoids, centroids, and the K-surface
 - A Streamlit interface for dynamic exploration over parameterized input curves
@@ -53,14 +53,14 @@ def precompute_matrix_operations(centers, pd_matrix_list):
     x_Ainv_x = np.array([centers[i].T @ A_inv_list[i] @ centers[i] for i in range(k)])
     return A_inv_list, A_inv_array, x_Ainv_x
 
-def compute_B_inv_and_m_lambda(lmbd, A_inv_array, x):
+def compute_B_inv_and_m_lambda(lmbd, A_inv_array, centers):
     """
     Given λ ∈ Δ^k, compute the barycentric precision matrix B(λ)^{-1} = Σ_i λ_i A_i^{-1},
     the weighted sum S = Σ_i λ_i A_i^{-1} x_i, and the centroid m(λ) = B^{-1}(λ) S.
 
     :param lmbd: ndarray of shape (k,), a point in the probability simplex
     :param A_inv_array: ndarray of shape (k, D, D), each A_i^{-1}
-    :param x: ndarray of shape (k, D), the center points x₁,...,x_k ∈ ℝᴰ
+    :param centers: ndarray of shape (k, D), the center points x₁,...,x_k ∈ ℝᴰ
 
     :return: (B_lambda_inv, m_lambda, S)
              - B_lambda_inv: the matrix B(λ)^{-1}
@@ -68,11 +68,11 @@ def compute_B_inv_and_m_lambda(lmbd, A_inv_array, x):
              - S: the weighted sum of A_i^{-1} x_i
     """
     B_lambda_inv = np.tensordot(lmbd, A_inv_array, axes=([0], [0]))
-    S = np.sum(lmbd[:, None] * np.einsum('ijk,ik->ij', A_inv_array, x), axis=0)
+    S = np.sum(lmbd[:, None] * np.einsum('ijk,ik->ij', A_inv_array, centers), axis=0)
     m_lambda = np.linalg.solve(B_lambda_inv, S)
     return B_lambda_inv, m_lambda, S
 
-def compute_K(lmbd, eps, xs, A_inv_array, x_Ainv_x):
+def compute_K(lmbd, eps, centers, A_inv_array, x_Ainv_x):
     """
     Compute the function K(λ) = ε² − C(λ), where
       C(λ) = Σ λ_i x_i^T A_i^{-1} x_i − m(λ)^T B(λ)^{-1} m(λ)
@@ -80,30 +80,30 @@ def compute_K(lmbd, eps, xs, A_inv_array, x_Ainv_x):
 
     :param lmbd: ndarray of shape (k,), λ ∈ Δ^k
     :param eps: float, the ε parameter in the ellipsoidal intersection test
-    :param xs: ndarray of shape (k, D), the centers x_i
+    :param centers: ndarray of shape (k, D), the centers x_i
     :param A_inv_array: ndarray of shape (k, D, D), the precision matrices A_i^{-1}
     :param x_Ainv_x: ndarray of shape (k,), containing x_i^T A_i^{-1} x_i
 
     :return: scalar value K(λ)
     """
-    B_lambda_inv, m_lambda, S = compute_B_inv_and_m_lambda(lmbd, A_inv_array, xs)
+    B_lambda_inv, m_lambda, S = compute_B_inv_and_m_lambda(lmbd, A_inv_array, centers)
     quad_term = m_lambda.dot(S)
     sum_term = np.dot(lmbd, x_Ainv_x)
     return eps ** 2 - (sum_term - quad_term)
 
-def compute_K_gradient(lmbd, xs, A_inv_array):
+def compute_K_gradient(lmbd, centers, A_inv_array):
     """
     Compute the gradient ∇K(λ), where
       ∂K/∂λ_j = −‖m(λ) − x_j‖²_{A_j^{-1}}.
 
     :param lmbd: ndarray of shape (k,), λ ∈ Δ^k
-    :param xs: ndarray of shape (k, D), center points x_i
+    :param centers: ndarray of shape (k, D), center points x_i
     :param A_inv_array: ndarray of shape (k, D, D), the precision matrices A_i^{-1}
 
     :return: ndarray of shape (k,), the gradient of K(λ)
     """
-    B_lambda_inv, m_lambda, S = compute_B_inv_and_m_lambda(lmbd, A_inv_array, xs)
-    diff = m_lambda - xs  # (x_j - m(λ)) for each j
+    B_lambda_inv, m_lambda, S = compute_B_inv_and_m_lambda(lmbd, A_inv_array, centers)
+    diff = m_lambda - centers  # (x_j - m(λ)) for each j
     grad = -np.einsum('ij,ijk,ik->i', diff, A_inv_array, diff)
     return grad
 
@@ -112,7 +112,10 @@ def compute_K_gradient(lmbd, xs, A_inv_array):
 #================================================================================================
 def project_to_prob_simplex(v):
     """
-    Project a real vector v ∈ ℝᵏ onto the k-dimensional probability simplex Δ^k.
+    Project a real vector v ∈ ℝᵏ onto the k-dimensional probability simplex Δ^k. This is a
+    relatively well-known algorithm. See Wang (2013) "Projection onto the probability simplex:
+    An efficient algorithm with a simple proof, and an application"
+
 
     :param v: ndarray of shape (k,), input vector
     :return: ndarray of shape (k,), projection of v onto Δ^k
@@ -124,12 +127,12 @@ def project_to_prob_simplex(v):
     return np.maximum(v - theta, 0)
 
 
-def projected_gradient_descent(eps, xs, A_inv_array, x_Ainv_x, step_size=0.001, max_iters=5000, tol=1e-10):
+def projected_gradient_descent(eps, centers, A_inv_array, x_Ainv_x, step_size=0.001, max_iters=5000, tol=1e-10):
     """
     Perform projected gradient descent to minimize K(λ) over the simplex Δ^k.
 
     :param eps: float, the ε parameter
-    :param xs: ndarray of shape (k, D), centers x_i
+    :param centers: ndarray of shape (k, D), centers x_i
     :param A_inv_array: ndarray of shape (k, D, D), precision matrices A_i^{-1}
     :param x_Ainv_x: ndarray of shape (k,), x_i^T A_i^{-1} x_i
     :param step_size: float, learning rate
@@ -142,32 +145,32 @@ def projected_gradient_descent(eps, xs, A_inv_array, x_Ainv_x, step_size=0.001, 
              - 'm_lambda': centroid m(λ)
              - 'B_lambda_inv': matrix B(λ)^{-1}
     """
-    k, D = xs.shape
+    k, D = centers.shape
     lmbd = np.ones(k) / k
 
     for _ in range(max_iters):
-        grad = compute_K_gradient(lmbd, xs, A_inv_array)
+        grad = compute_K_gradient(lmbd, centers, A_inv_array)
         lmbd_new = project_to_prob_simplex(lmbd - step_size * grad)
         if np.linalg.norm(lmbd_new - lmbd) < tol:
             break
         lmbd = lmbd_new
     # Compute the optimal precicision and centroid
-    B_lambda_inv, m_lambda, S = compute_B_inv_and_m_lambda(lmbd, A_inv_array, xs)
+    B_lambda_inv, m_lambda, S = compute_B_inv_and_m_lambda(lmbd, A_inv_array, centers)
     return {
         'lambda': lmbd,
-        'K_min': compute_K(lmbd, eps, xs, A_inv_array, x_Ainv_x),
+        'K_min': compute_K(lmbd, eps, centers, A_inv_array, x_Ainv_x),
         'm_lambda': m_lambda,
         'B_lambda_inv': B_lambda_inv if m_lambda is not None else None
     }
 
 # This minimzer uses scipy's routines.
-def minimize_K(eps, xs, A_inv_array, x_Ainv_x, solver="SLSQP"):
+def minimize_K(eps, centers, A_inv_array, x_Ainv_x, solver="SLSQP"):
     """
     Minimize K(λ) over λ ∈ Δ^k using either projected gradient descent ("pga") or
     a constrained solver from scipy (e.g., "SLSQP").
 
     :param eps: float, ε parameter
-    :param xs: ndarray of shape (k, D), centers x_i
+    :param centers: ndarray of shape (k, D), centers x_i
     :param A_inv_array: ndarray of shape (k, D, D), A_i^{-1}
     :param x_Ainv_x: ndarray of shape (k,), x_i^T A_i^{-1} x_i
     :param solver: str, either "pga" or a scipy.optimize.minimize solver name
@@ -175,44 +178,44 @@ def minimize_K(eps, xs, A_inv_array, x_Ainv_x, solver="SLSQP"):
     :return: dictionary containing keys 'lambda', 'K_min', 'm_lambda', 'B_lambda_inv', and
     optimization metadata
     """
-    k, D = xs.shape
+    k, D = centers.shape
 
     # If the user has passed one of the custom solvers, just call them and return.
     if solver == "pga":
-        return projected_gradient_descent(eps, xs, A_inv_array, x_Ainv_x)
+        return projected_gradient_descent(eps, centers, A_inv_array, x_Ainv_x)
     # Otherwise, we move on to use the available scipy solvers.
 
     # The gradient needs the same function signature as the objective function, so
     # we make a wrapper for convenience
-    def jac(lmbd, eps, xs, A_inv_array, x_Ainv_x):
-        return compute_K_gradient(lmbd, xs, A_inv_array)
+    def jac(lmbd, eps, centers, A_inv_array, x_Ainv_x):
+        return compute_K_gradient(lmbd, centers, A_inv_array)
 
     lmbd0 = np.ones(k) / k
     constraints = {'type': 'eq', 'fun': lambda lmbd: np.sum(lmbd) - 1}
     bounds = [(0, 1) for _ in range(k)]
 
-    res = minimize(compute_K, lmbd0, args=(eps, xs, A_inv_array, x_Ainv_x), method=solver,
+    res = minimize(compute_K, lmbd0, args=(eps, centers, A_inv_array, x_Ainv_x), method=solver,
                    jac=jac, bounds=bounds, constraints=constraints, tol=1e-10,
                    options={"maxiter": 5000})
 
     opt_lmbd = res.x
-    B_lambda_inv, m_lambda, S = compute_B_inv_and_m_lambda(opt_lmbd, A_inv_array, xs)
+    B_lambda_inv, m_lambda, S = compute_B_inv_and_m_lambda(opt_lmbd, A_inv_array, centers)
     return {'lambda': opt_lmbd, 'K_min': res.fun, 'm_lambda': m_lambda,
             'B_lambda_inv': B_lambda_inv, 'success': res.success, 'message': res.message}
 
-def minimize_K_boundary(eps, xs, A_inv_array, x_Ainv_x):
+def minimize_K_boundary(eps, centers, A_inv_array, x_Ainv_x):
     """
     Minimize K(λ) over the 1D edges of the simplex Δ^k by searching all line segments
     between pairs of basis vectors. Uses bounded scalar optimization.
 
     :param eps: float, ε parameter
-    :param xs: ndarray of shape (k, D), centers x_i
+    :param centers: ndarray of shape (k, D), centers x_i
     :param A_inv_array: ndarray of shape (k, D, D), A_i^{-1}
     :param x_Ainv_x: ndarray of shape (k,), x_i^T A_i^{-1} x_i
 
     :return: dictionary with best boundary λ, minimum K, m(λ), B(λ)^{-1}, edge info, and solver status
     """
-    k, D = xs.shape
+    k, D = centers.shape
     best = {
         'K_min': np.inf,
         'lambda': None,
@@ -233,7 +236,7 @@ def minimize_K_boundary(eps, xs, A_inv_array, x_Ainv_x):
     # objective along the edge (i,j)
     def K_edge(t, i, j):
         lam = make_lambda(i, j, t)
-        return compute_K(lam, eps, xs, A_inv_array, x_Ainv_x)
+        return compute_K(lam, eps, centers, A_inv_array, x_Ainv_x)
 
     for i in range(k):
         for j in range(i+1, k):
@@ -254,7 +257,7 @@ def minimize_K_boundary(eps, xs, A_inv_array, x_Ainv_x):
                 t_opt  = res.x
                 lam_opt = make_lambda(i, j, t_opt)
                 # B(λ)^{-1} = sum λ_i A_i^{-1}
-                B_lambda_inv, m_opt, S = compute_B_inv_and_m_lambda(lam_opt, A_inv_array, xs)
+                B_lambda_inv, m_opt, S = compute_B_inv_and_m_lambda(lam_opt, A_inv_array, centers)
                 best.update({
                     'K_min':    res.fun,
                     'lambda':   lam_opt,
@@ -287,19 +290,19 @@ def compute_precision_bounds(A_inv_list):
     beta = np.max(max_eigs)
     return alpha, beta
 
-def compute_mahalanobis_distances(m_lambda, points, A_inv_list):
+def compute_mahalanobis_distances(m_lambda, centers, A_inv_list):
     """
     Compute the Mahalanobis distance from m(λ) to each x_i using precision matrix A_i^{-1}.
 
     :param m_lambda: ndarray of shape (D,), the centroid m(λ)
-    :param points: ndarray of shape (k, D), the centers x_i
+    :param centers: ndarray of shape (k, D), the centers x_i
     :param A_inv_list: list of (D,D) precision matrices A_i^{-1}
 
     :return: ndarray of shape (k,), the Mahalanobis distances d_j = sqrt((m − x_j)^T A_j^{-1} (m − x_j))
     """
     djs = []
-    for i in range(len(points)):
-        diff = m_lambda - points[i]
+    for i in range(len(centers)):
+        diff = m_lambda - centers[i]
         d_j = diff.T @ A_inv_list[i] @ diff
         djs.append(np.sqrt(d_j))
     return np.array(djs)
@@ -363,6 +366,9 @@ def compute_precision_matrix(fx, fy, t_sym, t_val):
     else:
         tangent = tangent / np.linalg.norm(tangent)
     normal = np.array([-tangent[1], tangent[0]])
+    # Arbitrarily chosen varying ellipses:
+    # The scale (semi-axis length) in the tangent direction varies like the square of the first coordinate,
+    # while the scale in the normal direction varies like sin(x+y)^2
     sigma_t, sigma_n = 0.9 * p_val[0] ** 2, 0.1 * np.sin(p_val[1] * p_val[0]) ** 2 + 0.01
     Q = np.column_stack((tangent, normal))
     D = np.diag([sigma_t, sigma_n])
@@ -400,7 +406,7 @@ def ellipse_patch(center, Ainv, radius=1.0, edgecolor='black', linestyle="-"):
                    edgecolor=edgecolor, facecolor='none', linestyle=linestyle, fill=False)
 
 
-def plot_curve_and_ellipses(fx, fy, points, A_inv_matrices, epsilon, m_lambda, result):
+def plot_curve_and_ellipses(fx, fy, centers, A_inv_matrices, epsilon, m_lambda, result):
     """
     Plot the parameterized curve p(t), its associated ellipsoidal balls at three points,
     and the ellipse centered at m(λ*) with radius √K(λ*), when K(λ*) > 0.
@@ -410,7 +416,7 @@ def plot_curve_and_ellipses(fx, fy, points, A_inv_matrices, epsilon, m_lambda, r
 
     :param fx: sympy expression for x(t)
     :param fy: sympy expression for y(t)
-    :param points: ndarray of shape (3, 2), center points on the curve
+    :param centers: ndarray of shape (3, 2), center points on the curve
     :param A_inv_matrices: list of (2,2) inverse precision matrices for each point
     :param epsilon: float, ε radius for the ellipsoidal balls
     :param m_lambda: ndarray of shape (2,), the centroid m(λ*)
@@ -426,11 +432,11 @@ def plot_curve_and_ellipses(fx, fy, points, A_inv_matrices, epsilon, m_lambda, r
     ax.plot(curve_x, curve_y, 'gray', label='Curve p(t)')
 
     # Compute Mahalanobis distances -> alpha_star
-    djs = compute_mahalanobis_distances(m_lambda, points, A_inv_matrices)
+    djs = compute_mahalanobis_distances(m_lambda, centers, A_inv_matrices)
     alpha_star = float(np.max(djs))
 
     colors = ['red', 'green', 'blue']
-    for i, (pt, A_inv) in enumerate(zip(points, A_inv_matrices)):
+    for i, (pt, A_inv) in enumerate(zip(centers, A_inv_matrices)):
         ax.plot(pt[0], pt[1], marker='o', color=colors[i], label=f'p(t{i + 1})')
         ax.add_patch(ellipse_patch(pt, A_inv, epsilon, edgecolor=colors[i]))
         ax.add_patch(ellipse_patch(pt, A_inv, alpha_star, edgecolor='black', linestyle='--'))
@@ -451,8 +457,8 @@ def plot_curve_and_ellipses(fx, fy, points, A_inv_matrices, epsilon, m_lambda, r
     ax.legend()
 
     # --- Stable axis limits: gather all relevant x,y points ---
-    all_x = np.concatenate([curve_x, points[:, 0], [m_lambda[0]]])
-    all_y = np.concatenate([curve_y, points[:, 1], [m_lambda[1]]])
+    all_x = np.concatenate([curve_x, centers[:, 0], [m_lambda[0]]])
+    all_y = np.concatenate([curve_y, centers[:, 1], [m_lambda[1]]])
 
     # Compute bounding box + margin
     minx, maxx = np.min(all_x), np.max(all_x)
@@ -576,40 +582,40 @@ if fx is not None and fy is not None:
     epsilon = st.sidebar.slider("ε", 0.01, 8.0, 1.0, step=0.01)
     plot_path = st.sidebar.toggle("Plot bd^*-to-vertex path (experimental)", False)
     ts = [t1, t2, t3]
-    points, A_matrices = [], []
+    centers, A_matrices = [], []
     for t_val in ts:
         pt, A = compute_precision_matrix(fx, fy, t_sym, t_val)
-        points.append(pt)
+        centers.append(pt)
         A_matrices.append(A)
-    points = np.array(points)
+    centers = np.array(centers)
 
     # Precompute inverses and quadratic forms for the K(λ) minimization.
-    A_inv_list, A_inv_array, x_Ainv_x = precompute_matrix_operations(np.array(points), A_matrices)
+    A_inv_list, A_inv_array, x_Ainv_x = precompute_matrix_operations(np.array(centers), A_matrices)
 
     # Minimize K(λ)
-    result = minimize_K(epsilon, points, A_inv_array, x_Ainv_x, solver)
+    result = minimize_K(epsilon, centers, A_inv_array, x_Ainv_x, solver)
     lambda_star = result["lambda"]
     m_lambda = result['m_lambda']
 
     # Plot the curve and ellipses as before.
-    st.pyplot(plot_curve_and_ellipses(fx, fy, points, A_inv_list, epsilon, m_lambda, result))
+    st.pyplot(plot_curve_and_ellipses(fx, fy, centers, A_inv_list, epsilon, m_lambda, result))
 
     # --- New: Test Theorem 6 condition ---
     # 1. Compute K(b*) (minimum of K(λ) on the boundary)
-    boundary_solver = minimize_K_boundary(epsilon, points, A_inv_array, x_Ainv_x)
+    boundary_solver = minimize_K_boundary(epsilon, centers, A_inv_array, x_Ainv_x)
     k_b_star = boundary_solver["K_min"]
     b_star = boundary_solver["lambda"]
 
     # Plot the K(λ) surface.
     lambda_grid = np.linspace(0, 1, 30)
-    K_func = lambda lam: compute_K(lam, epsilon, points, A_inv_array, x_Ainv_x)
+    K_func = lambda lam: compute_K(lam, epsilon, centers, A_inv_array, x_Ainv_x)
     opt1 = np.array([result['lambda'][0], result['lambda'][1], result['K_min']])
     opt2 = np.array([b_star[0], b_star[1], k_b_star])
     st.pyplot(plot_K_surface(K_func, lambda_grid, [opt1, opt2],
                              b_star=b_star, elev=elev, azim=azim, plot_path=plot_path))
 
     # Compute Mahalanobis distances → δ_max (here called alpha_star)
-    djs = compute_mahalanobis_distances(m_lambda, points, A_inv_list)
+    djs = compute_mahalanobis_distances(m_lambda, centers, A_inv_list)
     delta_max = float(np.max(djs))
 
     # 2. Compute upper bounds (α and β) from the precision matrices
