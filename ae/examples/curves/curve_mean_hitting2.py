@@ -31,7 +31,7 @@ epochs_drift = 9000
 # Paths
 tn = 1.
 ntime = 1000
-npaths = 500
+npaths = 1000
 # Penalties
 tangent_angle_weight = 0.02
 tangent_drift_weight = 0.02
@@ -48,7 +48,7 @@ drift_act = nn.Tanh()
 diffusion_act = nn.Tanh()
 
 # === Data Generation ===
-curve = BellCurve()
+curve = Cubic()
 dynamics = LangevinHarmonicOscillator()
 manifold = RiemannianManifold(curve.local_coords(), curve.equation())
 local_drift = dynamics.drift(manifold)

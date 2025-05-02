@@ -1,3 +1,27 @@
+"""
+Ellipsoidal Ball Intersection via Convex Optimization of K(λ)
+
+This module implements the formulas for K and optimization-based method for testing
+intersection of ellipsoidal balls in ℝ^D, as developed in the accompanying paper write-up.
+
+Given a finite set of points x₁, ..., x_k ∈ ℝ^D and associated positive-definite matrices
+A₁, ..., A_k defining ellipsoidal balls E_ε(x_i) = { y ∈ ℝ^D : ‖y - x_i‖_{A_i^{-1}} ≤ ε },
+we compute whether the intersection ⋂ E_ε(x_i) is non-empty by minimizing an associated
+convex function K(λ) over the standard k-simplex Δ^k. The function K(λ) is derived from a
+weighted average of squared Mahalanobis distances and admits closed-form expressions for
+its value, gradient, and Hessian, although the Hessian is not used below explicitly.
+
+This code includes:
+- Computation of K(λ), its gradient, and curvature-based bounds
+- Solvers (projected gradient descent and constrained minimization) for minimizing K
+- Plotting utilities to visualize ellipsoids, centroids, and the K-surface
+- A Streamlit interface for dynamic exploration over parameterized input curves
+
+To run this streamlit app, you need to run in terminal:
+
+'streamlit run ./visualizer.py'
+
+"""
 import matplotlib.pyplot as plt
 import streamlit as st
 import numpy as np
@@ -6,20 +30,21 @@ import sympy as sp
 from scipy.optimize import minimize, minimize_scalar
 from matplotlib.patches import Ellipse
 
-# TODO: finish doc-strings and maybe some additional comments
-
 #=============================================================================================
 # 1. Functions for computing $K( \lambda ) $, and its Gradient
 #=============================================================================================
 def precompute_matrix_operations(centers, pd_matrix_list):
     """
-    Given points with shape (k, D) and a list of (D,D) matrices A_list (length k),
-    compute each inverse A_i^{-1}, stack them into an array, and also compute
-    the quadratic forms x_i^T A_i^{-1} x_i.
+    Compute the inverses A_i^{-1} of each precision matrix A_i in pd_matrix_list, stack these into an array,
+    and compute the quadratic forms x_i^T A_i^{-1} x_i for each center x_i.
 
-    :param centers:
-    :param pd_matrix_list:
-    :return:
+    :param centers: ndarray of shape (k, D), representing the centers x₁, ..., x_k ∈ ℝᴰ
+    :param pd_matrix_list: list of k positive-definite (D, D) ndarrays, A₁, ..., A_k
+
+    :return: (A_inv_list, A_inv_array, x_Ainv_x)
+             - A_inv_list: list of A_i^{-1}
+             - A_inv_array: ndarray of shape (k, D, D) stacking all A_i^{-1}
+             - x_Ainv_x: ndarray of shape (k,), containing x_i^T A_i^{-1} x_i for each i
     """
     k, D = centers.shape
     A_inv_list = [np.linalg.inv(pd_matrix_list[i]) for i in range(k)]
@@ -30,12 +55,17 @@ def precompute_matrix_operations(centers, pd_matrix_list):
 
 def compute_B_inv_and_m_lambda(lmbd, A_inv_array, x):
     """
+    Given λ ∈ Δ^k, compute the barycentric precision matrix B(λ)^{-1} = Σ_i λ_i A_i^{-1},
+    the weighted sum S = Σ_i λ_i A_i^{-1} x_i, and the centroid m(λ) = B^{-1}(λ) S.
 
+    :param lmbd: ndarray of shape (k,), a point in the probability simplex
+    :param A_inv_array: ndarray of shape (k, D, D), each A_i^{-1}
+    :param x: ndarray of shape (k, D), the center points x₁,...,x_k ∈ ℝᴰ
 
-    :param lmbd:
-    :param A_inv_array:
-    :param x:
-    :return:
+    :return: (B_lambda_inv, m_lambda, S)
+             - B_lambda_inv: the matrix B(λ)^{-1}
+             - m_lambda: the centroid m(λ)
+             - S: the weighted sum of A_i^{-1} x_i
     """
     B_lambda_inv = np.tensordot(lmbd, A_inv_array, axes=([0], [0]))
     S = np.sum(lmbd[:, None] * np.einsum('ijk,ik->ij', A_inv_array, x), axis=0)
@@ -44,26 +74,18 @@ def compute_B_inv_and_m_lambda(lmbd, A_inv_array, x):
 
 def compute_K(lmbd, eps, xs, A_inv_array, x_Ainv_x):
     """
-    Computes K(λ) = eps^2 - C(λ), where
-       A_λ^{-1} = Σ_i λ_i A_i^{-1}
-       S = Σ_i λ_i (A_i^{-1} @ xs[i])
-       m(λ) is obtained by solving A_λ^{-1} m = S,
-       and C(λ) = (Σ_i λ_i x_i^T A_i^{-1} x_i) - m(λ)^T S.
+    Compute the function K(λ) = ε² − C(λ), where
+      C(λ) = Σ λ_i x_i^T A_i^{-1} x_i − m(λ)^T B(λ)^{-1} m(λ)
+    as described in Lemma 4 of the paper.
 
-    :param lmbd:
-    :param eps:
-    :param xs:
-    :param A_inv_array:
-    :param x_Ainv_x:
-    :return:
+    :param lmbd: ndarray of shape (k,), λ ∈ Δ^k
+    :param eps: float, the ε parameter in the ellipsoidal intersection test
+    :param xs: ndarray of shape (k, D), the centers x_i
+    :param A_inv_array: ndarray of shape (k, D, D), the precision matrices A_i^{-1}
+    :param x_Ainv_x: ndarray of shape (k,), containing x_i^T A_i^{-1} x_i
+
+    :return: scalar value K(λ)
     """
-    # B_lambda_inv = np.tensordot(lmbd, A_inv_array, axes=([0], [0]))
-    # S = np.sum(lmbd[:, None] * np.einsum('ijk,ik->ij', A_inv_array, xs), axis=0)
-    # try:
-    #     m_lambda = np.linalg.solve(B_lambda_inv, S)
-    # except np.linalg.LinAlgError:
-    #     print("Non PD!")
-    #     return 1e10  # Penalty for singularity
     B_lambda_inv, m_lambda, S = compute_B_inv_and_m_lambda(lmbd, A_inv_array, xs)
     quad_term = m_lambda.dot(S)
     sum_term = np.dot(lmbd, x_Ainv_x)
@@ -71,13 +93,14 @@ def compute_K(lmbd, eps, xs, A_inv_array, x_Ainv_x):
 
 def compute_K_gradient(lmbd, xs, A_inv_array):
     """
-    Computes the gradient ∇K(λ) using the simplified formula:
-      ∂K/∂λ_j = -(x_j - m(λ))^T A_j^{-1} (x_j - m(λ))
+    Compute the gradient ∇K(λ), where
+      ∂K/∂λ_j = −‖m(λ) − x_j‖²_{A_j^{-1}}.
 
-    :param lmbd:
-    :param xs:
-    :param A_inv_array:
-    :return:
+    :param lmbd: ndarray of shape (k,), λ ∈ Δ^k
+    :param xs: ndarray of shape (k, D), center points x_i
+    :param A_inv_array: ndarray of shape (k, D, D), the precision matrices A_i^{-1}
+
+    :return: ndarray of shape (k,), the gradient of K(λ)
     """
     B_lambda_inv, m_lambda, S = compute_B_inv_and_m_lambda(lmbd, A_inv_array, xs)
     diff = m_lambda - xs  # (x_j - m(λ)) for each j
@@ -87,12 +110,12 @@ def compute_K_gradient(lmbd, xs, A_inv_array):
 #================================================================================================
 # 2. Optimization functions.
 #================================================================================================
-def project_simplex(v):
+def project_to_prob_simplex(v):
     """
-    Project a vector v onto the probability simplex Δ_k.
+    Project a real vector v ∈ ℝᵏ onto the k-dimensional probability simplex Δ^k.
 
-    :param v:
-    :return:
+    :param v: ndarray of shape (k,), input vector
+    :return: ndarray of shape (k,), projection of v onto Δ^k
     """
     v_sorted = np.sort(v)[::-1]
     v_cumsum = np.cumsum(v_sorted)
@@ -103,23 +126,28 @@ def project_simplex(v):
 
 def projected_gradient_descent(eps, xs, A_inv_array, x_Ainv_x, step_size=0.001, max_iters=5000, tol=1e-10):
     """
-    Minimize K(λ) using projected gradient descent onto the probability simplex.
+    Perform projected gradient descent to minimize K(λ) over the simplex Δ^k.
 
-    :param eps:
-    :param xs:
-    :param A_inv_array:
-    :param x_Ainv_x:
-    :param step_size:
-    :param max_iters:
-    :param tol:
-    :return:
+    :param eps: float, the ε parameter
+    :param xs: ndarray of shape (k, D), centers x_i
+    :param A_inv_array: ndarray of shape (k, D, D), precision matrices A_i^{-1}
+    :param x_Ainv_x: ndarray of shape (k,), x_i^T A_i^{-1} x_i
+    :param step_size: float, learning rate
+    :param max_iters: int, maximum number of iterations
+    :param tol: float, stopping tolerance on λ-update norm
+
+    :return: dictionary containing
+             - 'lambda': minimizing λ
+             - 'K_min': minimum K(λ)
+             - 'm_lambda': centroid m(λ)
+             - 'B_lambda_inv': matrix B(λ)^{-1}
     """
     k, D = xs.shape
     lmbd = np.ones(k) / k
 
     for _ in range(max_iters):
         grad = compute_K_gradient(lmbd, xs, A_inv_array)
-        lmbd_new = project_simplex(lmbd - step_size * grad)
+        lmbd_new = project_to_prob_simplex(lmbd - step_size * grad)
         if np.linalg.norm(lmbd_new - lmbd) < tol:
             break
         lmbd = lmbd_new
@@ -132,17 +160,20 @@ def projected_gradient_descent(eps, xs, A_inv_array, x_Ainv_x, step_size=0.001, 
         'B_lambda_inv': B_lambda_inv if m_lambda is not None else None
     }
 
-
-def minimize_K(eps, xs, A_inv_array, x_Ainv_x, solver="pga"):
+# This minimzer uses scipy's routines.
+def minimize_K(eps, xs, A_inv_array, x_Ainv_x, solver="SLSQP"):
     """
-    Minimizes K(λ) = eps^2 - C(λ) over the probability simplex using the simplified gradient.
+    Minimize K(λ) over λ ∈ Δ^k using either projected gradient descent ("pga") or
+    a constrained solver from scipy (e.g., "SLSQP").
 
-    :param eps:
-    :param xs:
-    :param A_inv_array:
-    :param x_Ainv_x:
-    :param solver:
-    :return:
+    :param eps: float, ε parameter
+    :param xs: ndarray of shape (k, D), centers x_i
+    :param A_inv_array: ndarray of shape (k, D, D), A_i^{-1}
+    :param x_Ainv_x: ndarray of shape (k,), x_i^T A_i^{-1} x_i
+    :param solver: str, either "pga" or a scipy.optimize.minimize solver name
+
+    :return: dictionary containing keys 'lambda', 'K_min', 'm_lambda', 'B_lambda_inv', and
+    optimization metadata
     """
     k, D = xs.shape
 
@@ -171,8 +202,15 @@ def minimize_K(eps, xs, A_inv_array, x_Ainv_x, solver="pga"):
 
 def minimize_K_boundary(eps, xs, A_inv_array, x_Ainv_x):
     """
-    Find the minimum of K(λ) = eps^2 - C(λ) over just the 1D edges of Δ^k.
-    Returns the best λ on any edge, its K-value, m(λ), A(λ), and solver info.
+    Minimize K(λ) over the 1D edges of the simplex Δ^k by searching all line segments
+    between pairs of basis vectors. Uses bounded scalar optimization.
+
+    :param eps: float, ε parameter
+    :param xs: ndarray of shape (k, D), centers x_i
+    :param A_inv_array: ndarray of shape (k, D, D), A_i^{-1}
+    :param x_Ainv_x: ndarray of shape (k,), x_i^T A_i^{-1} x_i
+
+    :return: dictionary with best boundary λ, minimum K, m(λ), B(λ)^{-1}, edge info, and solver status
     """
     k, D = xs.shape
     best = {
@@ -233,8 +271,13 @@ def minimize_K_boundary(eps, xs, A_inv_array, x_Ainv_x):
 # 3. Functions for estimating curvature bounds for our short-cut check:
 #======================================================================================================
 def compute_precision_bounds(A_inv_list):
-    """For each precision matrix A⁻¹, compute its maximum eigenvalue.
-       Then set α = min(max_eigs) and β = max(max_eigs).
+    """
+    Compute α = min_i λ_max(A_i^{-1}) and β = max_i λ_max(A_i^{-1}) over all precision matrices.
+    Used in curvature bounds for sufficient conditions of intersection.
+
+    :param A_inv_list: list of (D,D) precision matrices A_i^{-1}
+
+    :return: (alpha, beta), lower and upper spectral bounds
     """
     max_eigs = []
     for A_inv in A_inv_list:
@@ -246,11 +289,13 @@ def compute_precision_bounds(A_inv_list):
 
 def compute_mahalanobis_distances(m_lambda, points, A_inv_list):
     """
+    Compute the Mahalanobis distance from m(λ) to each x_i using precision matrix A_i^{-1}.
 
-    :param m_lambda:
-    :param points:
-    :param A_inv_list:
-    :return:
+    :param m_lambda: ndarray of shape (D,), the centroid m(λ)
+    :param points: ndarray of shape (k, D), the centers x_i
+    :param A_inv_list: list of (D,D) precision matrices A_i^{-1}
+
+    :return: ndarray of shape (k,), the Mahalanobis distances d_j = sqrt((m − x_j)^T A_j^{-1} (m − x_j))
     """
     djs = []
     for i in range(len(points)):
@@ -268,9 +313,15 @@ def compute_mahalanobis_distances(m_lambda, points, A_inv_list):
 #====================================================================================================
 def parse_functions(func_str):
     """
+    Parse a string of the form 'x(t), y(t)' into sympy expressions fx, fy and symbol t. Here, 'x(t)' and
+    'y(t)' can be any smooth functions of t. To be sure what is passed is literally a string, e.g.
 
-    :param func_str:
-    :return:
+    func_str = 'sin(t), t*cos(t)'
+
+    is a valid input to pass.
+
+    :param func_str: str, input like "cos(t), sin(t)"
+    :return: (fx, fy, t), where fx and fy are sympy expressions, and t is the sympy symbol
     """
     t = sp.symbols('t')
     try:
@@ -289,12 +340,18 @@ def parse_functions(func_str):
 # each point of the point cloud $\{x_1, x_2, x_3\}$
 def compute_precision_matrix(fx, fy, t_sym, t_val):
     """
+    Given a parametric curve (fx, fy) in sympy form, and a scalar t_val, compute:
+    - the point p(t_val)
+    - the tangent vector at p(t_val)
+    - the normal vector
+    - construct an ellipse-aligned positive-definite matrix A using tangent and normal directions
 
-    :param fx:
-    :param fy:
-    :param t_sym:
-    :param t_val:
-    :return:
+    :param fx: sympy expression for x(t)
+    :param fy: sympy expression for y(t)
+    :param t_sym: sympy symbol t
+    :param t_val: float, the value of t
+
+    :return: (p_val, A), point and (2,2) positive-definite matrix
     """
     p = sp.Matrix([fx, fy])
     p_val = np.array([float(p.subs(t_sym, t_val)[0]), float(p.subs(t_sym, t_val)[1])])
@@ -317,15 +374,18 @@ def compute_precision_matrix(fx, fy, t_sym, t_val):
 #===================================================================================================
 def ellipse_patch(center, Ainv, radius=1.0, edgecolor='black', linestyle="-"):
     """
-    Given an inverse precision matrix Ainv, create an Ellipse patch.
-    The semi-axis lengths are computed as radius/sqrt(eigenvalue) and doubled for full axis lengths.
+    Create a matplotlib Ellipse patch from a 2D inverse precision matrix Ainv.
 
-    :param center:
-    :param Ainv:
-    :param radius:
-    :param edgecolor:
-    :param linestyle:
-    :return:
+    The resulting ellipse has center `center`, semi-axes determined by the inverse square roots
+    of the eigenvalues of Ainv scaled by `radius`, and orientation determined by its eigenvectors.
+
+    :param center: ndarray of shape (2,), the center of the ellipse
+    :param Ainv: ndarray of shape (2, 2), the inverse precision matrix A^{-1}
+    :param radius: float, scaling factor for the ellipse radii (default: 1.0)
+    :param edgecolor: str, color of the ellipse edge (default: 'black')
+    :param linestyle: str, line style for the ellipse (default: '-')
+
+    :return: matplotlib.patches.Ellipse object
     """
     vals, vecs = np.linalg.eigh(Ainv)
     sorted_indices = np.argsort(vals)  # ascending order
@@ -342,15 +402,20 @@ def ellipse_patch(center, Ainv, radius=1.0, edgecolor='black', linestyle="-"):
 
 def plot_curve_and_ellipses(fx, fy, points, A_inv_matrices, epsilon, m_lambda, result):
     """
+    Plot the parameterized curve p(t), its associated ellipsoidal balls at three points,
+    and the ellipse centered at m(λ*) with radius √K(λ*), when K(λ*) > 0.
 
-    :param fx:
-    :param fy:
-    :param points:
-    :param A_inv_matrices:
-    :param epsilon:
-    :param m_lambda:
-    :param result:
-    :return:
+    Each ellipse is drawn using its local inverse precision matrix and scaled by ε and δ_max.
+    Also marks the optimal centroid m(λ*) and computes bounding box with 20% margin.
+
+    :param fx: sympy expression for x(t)
+    :param fy: sympy expression for y(t)
+    :param points: ndarray of shape (3, 2), center points on the curve
+    :param A_inv_matrices: list of (2,2) inverse precision matrices for each point
+    :param epsilon: float, ε radius for the ellipsoidal balls
+    :param m_lambda: ndarray of shape (2,), the centroid m(λ*)
+    :param result: dict containing keys 'K_min' and 'B_lambda_inv' for final ellipse if K_min > 0
+    :return: matplotlib.figure.Figure object with the plot
     """
     fig, ax = plt.subplots(figsize=(6, 6))
     t_vals = np.linspace(0, 2 * np.pi, 300)
@@ -405,11 +470,21 @@ def plot_curve_and_ellipses(fx, fy, points, A_inv_matrices, epsilon, m_lambda, r
 
 def plot_K_surface(K_func, lambda_grid, opt_pts, b_star=None, num_t=200, elev=30, azim=135, plot_path=False):
     """
-    :param K_func:      function taking a length‑3 array λ↦K(λ)
-    :param lambda_grid: 1D array of λ₁,λ₂ values for meshing the simplex
-    :param opt_pts:     list of optimizer points [ (λ1,λ2,λ3), ... ] to scatter
-    :param b_star:      optional length‑3 array [b1*, b2*, 0] defining boundary minimizer
-    :param num_t:       number of samples along t∈[0,1] for the red line
+    Generate a 3D surface plot of K(λ) over the 2-simplex Δ³ using a grid of (λ₁, λ₂) values.
+
+    This function also marks the global and boundary optima on the surface and optionally draws
+    a curve from b* to a simplex vertex representing a 1D path in λ-space.
+
+    :param K_func: callable, takes a 3-vector λ and returns K(λ)
+    :param lambda_grid: 1D ndarray, grid values for λ₁ and λ₂ in [0, 1] to form mesh
+    :param opt_pts: list of two 3-element arrays (global and boundary minima) with λ and K(λ)
+    :param b_star: optional ndarray of shape (3,), boundary minimizer λ
+    :param num_t: int, number of samples to interpolate path if plot_path is True (default: 200)
+    :param elev: float, elevation angle for the 3D plot (default: 30)
+    :param azim: float, azimuth angle for the 3D plot (default: 135)
+    :param plot_path: bool, whether to draw the path from b* to a vertex (default: False)
+
+    :return: matplotlib.figure.Figure object with the 3D surface plot
     """
     fig = plt.figure(figsize=(8, 6))
     ax  = fig.add_subplot(111, projection='3d')
@@ -428,12 +503,6 @@ def plot_K_surface(K_func, lambda_grid, opt_pts, b_star=None, num_t=200, elev=30
     ax.plot_surface(L1, L2, K_vals,
                     cmap='inferno', edgecolor='none', alpha=0.2)
 
-    # # --- scatter any optima you already have:
-    # color = "b"
-    # for (l1, l2, l3) in opt_pts:
-    #     ax.scatter(l1, l2, l3, color=color, s=50)
-    #     color = "r"
-
     # --- scatter any optima you already have, with legend ---
     (l1, l2, l3) = opt_pts[0]  # global minimum
     ax.scatter(l1, l2, l3, color="b", s=50, label="Global minimum")
@@ -449,6 +518,7 @@ def plot_K_surface(K_func, lambda_grid, opt_pts, b_star=None, num_t=200, elev=30
     ax.plot_surface(L1, L2, zero_plane,
                     color='gray', alpha=0.4, edgecolor='none')
 
+    # Experimental feature! We plot the path from K(b^*) to another vertex.
     # --- now overlay the boundary‐to‐vertex curve if requested:
     if b_star is not None and plot_path:
         t = np.linspace(0, 1, num_t)
@@ -491,18 +561,17 @@ def plot_K_surface(K_func, lambda_grid, opt_pts, b_star=None, num_t=200, elev=30
 st.title("Intersections of Ellipsoidal Balls & K(λ) Surface")
 st.sidebar.markdown(
     """Enter a parameterized curve p(t) = (x(t), y(t)) (e.g. `cos(t), sin(t)`),
-and adjust sliders for three points and ε to visualize ellipsoidal intersections.
-Now also testing the sufficient condition from Theorem 6."""
+and adjust sliders for three points and ε to visualize ellipsoidal intersections."""
 )
 func_str = st.sidebar.text_input("Enter x(t), y(t)", "cos(t)*(1.5+1.4*cos(2*t)^2), sin(t)*(1.5+1.4*cos(2*t)^2)")
 solver = st.sidebar.radio("Solver", ["SLSQP", "pga"])
 # Sidebar sliders for view angles
-elev = st.sidebar.slider("Elevation angle", min_value=0, max_value=90, value=30)
-azim = st.sidebar.slider("Azimuth angle", min_value=0, max_value=360, value=135)
+elev = st.sidebar.slider("Elevation angle for Surface", min_value=0, max_value=90, value=30)
+azim = st.sidebar.slider("Azimuth angle for Surface", min_value=0, max_value=360, value=135)
 fx, fy, t_sym = parse_functions(func_str)
 
 if fx is not None and fy is not None:
-    # Get three t values
+    # Get three t values--these are the local coordinates for the k=3 points on the curve/manifold.
     t1, t2, t3 = [st.sidebar.slider(f"t{i}", 0.0, 2 * np.pi, i * np.pi / 2, step=0.01) for i in range(1, 4)]
     epsilon = st.sidebar.slider("ε", 0.01, 8.0, 1.0, step=0.01)
     plot_path = st.sidebar.toggle("Plot bd^*-to-vertex path (experimental)", False)
