@@ -54,7 +54,7 @@ class CurveBase(ABC):
 
 # Curves of the form (u, f(u))
 class Parabola(CurveBase):
-    def __init__(self, a=2.):
+    def __init__(self, a=1.):
         super().__init__()
         self.a = a
 

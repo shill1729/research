@@ -154,6 +154,7 @@ def plot_ellipses_and_K(centers, A_invs, epsilon2, title, xlim=(-1, 3.5), ylim=(
     ax2.set_xlabel('λ₁')
     ax2.set_ylabel('λ₂')
     ax2.set_zlabel('K(λ)')
+    ax2.set_zlim(-0.5, 1.5)
     ax2.set_title(f'K(λ) Surface\n{title}')
     fig.colorbar(surf)
 

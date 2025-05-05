@@ -18,15 +18,15 @@ project = True
 eps_grid_size = 10
 num_test = 20000
 h = 0.001
-n_paths = 1000
+n_paths = 30
 # Define a list of time horizons to test
 time_horizons = [0.5]
 
 
 # Load the pre-trained model: note working directory is currently ae/experiments
-# model_dir = "examples/surfaces/trained_models/ProductSurface/RiemannianBrownianMotion/trained_20250424-034955_h[16]_df[16]_dr[16]_lr0.001_epochs9000_not_annealed"
+model_dir = "examples/surfaces/trained_models/ProductSurface/RiemannianBrownianMotion/trained_20250424-034955_h[16]_df[16]_dr[16]_lr0.001_epochs9000_not_annealed"
 # model_dir = "examples/surfaces/trained_models/Paraboloid/RiemannianBrownianMotion/trained_20250428-022547_h[32]_df[32]_dr[32]_lr0.001_epochs9000_not_annealed"
-model_dir = "examples/surfaces/trained_models/RationalSurface/LangevinHarmonicOscillator/trained_20250428-132436_h[32]_df[32]_dr[32]_lr0.001_epochs9000_not_annealed"
+# model_dir = "examples/surfaces/trained_models/RationalSurface/LangevinHarmonicOscillator/trained_20250428-132436_h[32]_df[32]_dr[32]_lr0.001_epochs9000_not_annealed"
 trainer = Trainer.load_from_pretrained(model_dir, device=device, large_dim=large_dim)
 trainer.models = {name:model.to(device) for name, model in trainer.models.items()}
 trainer.ambient_drift.to(device)

@@ -8,26 +8,29 @@ Visualize one step or entire sample paths of Euler-Maruyama for
 """
 import matplotlib.pyplot as plt
 import seaborn as sns
+import pandas as pd
 
 from ae.toydata.curves import *
 from ae.toydata.local_dynamics import *
 from ae.toydata import RiemannianManifold, PointCloud
 from ae.utils import process_data
 
-n_train = 3
+n_train = 2
 train_seed = None
 path_seed = None
+same_noise = False
+use_xy = True # Use (x,y) as the input to the ambient SDE coefficients vs just (x,)
 
 # Manifold parameters: dimensions and boundary
 intrinsic_dim = 1
 extrinsic_dim = 2
 epsilon = 0.1
-space_grid_size = 30
+space_grid_size = 50
 
 # Sample path input
-tn = 0.02
-ntime = 1
-n_ensemble = 200
+tn = 0.5
+ntime = 500
+n_ensemble = 1000
 h = tn / ntime
 time_grid = np.linspace(0, tn, ntime+1)
 # ============================================================================
@@ -61,6 +64,22 @@ def local_drift(z):
 def local_diffusion(z):
     return point_cloud.np_local_diffusion(*z)
 
+def extrinsic_drift_xy(p):
+    x = p[0]
+    y = p[1]
+    n1 = -2 * x
+    n2 = 1
+    return np.array([n1, n2]) / (4*y+1)**2
+
+def extrinsic_diffusion_xy(p):
+    x = p[0]
+    y = p[1]
+    p11 = 1 / (4*y+1)
+    p12 = 2 * x / (4*y+1)
+    p22 = 4 * y/ (4*y+1)
+    return np.array([[p11, p12], [p12, p22]])
+
+
 # Pick starting point
 x0 = x[0, :].detach().numpy()
 z0 = local_x[0, :]
@@ -76,27 +95,45 @@ local_gt_lifted[0, :] = x0
 ambient_gt[0, :] = x0
 ambient_gt_path_recon[0, :] = x0
 ambient_gt_step_recon[0, :] = x0
+
 rng = np.random.default_rng(path_seed)
+em_step = None
 for i in range(ntime):
     # Generate GT sample path in local coordinates
     db = rng.normal(scale=np.sqrt(h), size=intrinsic_dim).reshape(intrinsic_dim, 1)
     local_gt[i+1, :] = local_gt[i, :] + h * local_drift(local_gt[i, :]) + (local_diffusion(local_gt[i, :]) @ db).reshape(intrinsic_dim)
 
     # Generate GT sample path directly in ambient coordinates
-    # dw = rng.normal(scale=np.sqrt(h), size=intrinsic_dim).reshape(intrinsic_dim, 1)
-    ambient_gt[i+1, :] = ambient_gt[i, :] + h * extrinsic_drift(ambient_gt[i, :]) + (extrinsic_diffusion(ambient_gt[i, :]) @ db).reshape(extrinsic_dim)
+    if same_noise and not use_xy:
+        dw = db
+    else:
+        if use_xy:
+            dw = rng.normal(scale=np.sqrt(h), size=extrinsic_dim).reshape(extrinsic_dim, 1)
+            ambient_gt[i + 1, :] = ambient_gt[i, :] + h * extrinsic_drift_xy(ambient_gt[i, :]) + (
+                        extrinsic_diffusion_xy(ambient_gt[i, :]) @ dw).reshape(extrinsic_dim)
 
-    # Generate GT directly in ambient coordinates with step-wise reconstruction pass
-    em_step = ambient_gt_step_recon[i, :] + h * extrinsic_drift(ambient_gt_step_recon[i, :]) + (
-                extrinsic_diffusion(ambient_gt_step_recon[i, :]) @ db).reshape(extrinsic_dim)
+            # Generate GT directly in ambient coordinates with step-wise reconstruction pass
+            em_step = ambient_gt_step_recon[i, :] + h * extrinsic_drift_xy(ambient_gt_step_recon[i, :]) + (
+                    extrinsic_diffusion_xy(ambient_gt_step_recon[i, :]) @ dw).reshape(extrinsic_dim)
+        else:
+            dw = rng.normal(scale=np.sqrt(h), size=intrinsic_dim).reshape(intrinsic_dim, 1)
+            ambient_gt[i + 1, :] = ambient_gt[i, :] + h * extrinsic_drift(ambient_gt[i, :]) + (
+                        extrinsic_diffusion(ambient_gt[i, :]) @ dw).reshape(extrinsic_dim)
+
+            # Generate GT directly in ambient coordinates with step-wise reconstruction pass
+            em_step = ambient_gt_step_recon[i, :] + h * extrinsic_drift(ambient_gt_step_recon[i, :]) + (
+                    extrinsic_diffusion(ambient_gt_step_recon[i, :]) @ dw).reshape(extrinsic_dim)
+
     ambient_gt_step_recon[i + 1, :] = point_cloud.np_phi(em_step[0]).squeeze()
 
 
 # Lifting and path-wise reconstruction
-for i in range(ntime):
-    local_gt_lifted[i+1, :] = point_cloud.np_phi(local_gt[i+1]).squeeze()
-    ambient_gt_path_recon[i + 1, :] = point_cloud.np_phi(ambient_gt[i+1, 0]).squeeze()
+for i in range(ntime+1):
+    local_gt_lifted[i, :] = point_cloud.np_phi(local_gt[i]).squeeze()
+    ambient_gt_path_recon[i, :] = point_cloud.np_phi(ambient_gt[i, 0]).squeeze()
 
+print("Error between local coordinate of step-wise and path recon")
+print(np.mean(np.abs(ambient_gt_path_recon[:, 0]-ambient_gt_step_recon[:, 0])))
 
 # Creating the manifold for reference:
 curve_grid = np.zeros((space_grid_size, extrinsic_dim))
@@ -150,8 +187,6 @@ ax.legend()
 plt.show()
 
 # Distribution analysis:
-
-
 # ============================================================================
 # Ensemble Simulation for Terminal Point Distributions
 # ============================================================================
@@ -162,10 +197,13 @@ terminal_points = {
     "Step-recon": [],
 }
 
-for i in range(n_ensemble):
-    # Regenerate drift
+for j in range(n_ensemble):
+    # Initialize paths
     local_path = np.zeros((ntime + 1, intrinsic_dim))
     local_path[0, :] = z0
+
+    local_lifted_path = np.zeros((ntime + 1, extrinsic_dim))
+    local_lifted_path[0, :] = x0
 
     ambient_path = np.zeros((ntime + 1, extrinsic_dim))
     ambient_path[0, :] = x0
@@ -175,28 +213,45 @@ for i in range(n_ensemble):
 
     step_recon = np.zeros((ntime + 1, extrinsic_dim))
     step_recon[0, :] = x0
+    for i in range(ntime):
+        # Simulate with new randomness
+        db = np.random.normal(scale=np.sqrt(h), size=(intrinsic_dim, 1))
+        if same_noise:
+            dw = db
+        else:
+            if use_xy:
+                dw = rng.normal(scale=np.sqrt(h), size=extrinsic_dim).reshape(extrinsic_dim, 1)
+                ambient_path[i + 1, :] = ambient_path[i, :] + h * extrinsic_drift_xy(ambient_path[i, :]) + (
+                            extrinsic_diffusion_xy(ambient_path[i, :]) @ dw).reshape(extrinsic_dim)
+                em_step = step_recon[i, :] + h * extrinsic_drift_xy(step_recon[i, :]) + (
+                            extrinsic_diffusion_xy(step_recon[i, :]) @ dw).reshape(extrinsic_dim)
+            else:
+                dw = rng.normal(scale=np.sqrt(h), size=intrinsic_dim).reshape(intrinsic_dim, 1)
+                ambient_path[i + 1, :] = ambient_path[i, :] + h * extrinsic_drift(ambient_path[i, :]) + (
+                            extrinsic_diffusion(ambient_path[i, :]) @ dw).reshape(extrinsic_dim)
+                em_step = step_recon[i, :] + h * extrinsic_drift(step_recon[i, :]) + (
+                            extrinsic_diffusion(step_recon[i, :]) @ dw).reshape(extrinsic_dim)
 
-    # Simulate with new randomness
-    db = np.random.normal(scale=np.sqrt(h), size=(intrinsic_dim, 1))
-    local_path[1, :] = local_path[0, :] + h * local_drift(local_path[0, :]) + (local_diffusion(local_path[0, :]) @ db).reshape(intrinsic_dim)
-    ambient_path[1, :] = ambient_path[0, :] + h * extrinsic_drift(ambient_path[0, :]) + (extrinsic_diffusion(ambient_path[0, :]) @ db).reshape(extrinsic_dim)
+        local_path[i+1, :] = local_path[i, :] + h * local_drift(local_path[i, :]) + (local_diffusion(local_path[i, :]) @ db).reshape(intrinsic_dim)
+        step_recon[i+1, :] = point_cloud.np_phi(em_step[0]).squeeze()
 
-    path_recon[1, :] = point_cloud.np_phi(ambient_path[1, 0]).squeeze()
-    em_step = ambient_path[0, :] + h * extrinsic_drift(ambient_path[0, :]) + (extrinsic_diffusion(ambient_path[0, :]) @ db).reshape(extrinsic_dim)
-    step_recon[1, :] = point_cloud.np_phi(em_step[0]).squeeze()
-
-    # Lift local path
-    lifted_local = point_cloud.np_phi(local_path[1, :]).squeeze()
+    for i in range(ntime+1):
+        # Lift local path
+        local_lifted_path[i, :] = point_cloud.np_phi(local_path[i, :]).squeeze()
+        # Reconstruct ambient path
+        path_recon[i, :] = point_cloud.np_phi(ambient_path[i, 0]).squeeze()
 
     # Store terminal points
-    terminal_points["Lifted Local"].append(lifted_local)
-    terminal_points["Ambient"].append(ambient_path[1, :])
-    terminal_points["Post-recon"].append(path_recon[1, :])
-    terminal_points["Step-recon"].append(step_recon[1, :])
+    terminal_points["Lifted Local"].append(local_lifted_path[-1, :])
+    terminal_points["Ambient"].append(ambient_path[-1, :])
+    terminal_points["Post-recon"].append(path_recon[-1, :])
+    terminal_points["Step-recon"].append(step_recon[-1, :])
 
 # Stack results into arrays
 for key in terminal_points:
     terminal_points[key] = np.stack(terminal_points[key], axis=0)  # shape: (n_ensemble, extrinsic_dim)
+
+
 
 # ============================================================================
 # Plotting terminal point distributions
@@ -232,4 +287,31 @@ for i in range(extrinsic_dim):
 plt.tight_layout()
 plt.show()
 
+#================================================================================================
+# Feynman-Kac statistics
+#================================================================================================
+# Define named test functions
+test_functions_named = {
+    r"$x_1$": lambda x: x[:, 0],
+    r"$x_2$": lambda x: x[:, 1],
+    r"$x_1 + x_2$": lambda x: np.sum(x, axis=1),
+    r"$x_1 * x_2$": lambda x: np.prod(x, axis=1),
+    r"$sin(x_1 x_2)$": lambda x: np.sin(5 * np.prod(x, axis=1)),
+    r"$|x|$": lambda x: np.linalg.vector_norm(x, axis=1),
+    r"$|x_2-f(x_1)|$": lambda x: np.abs(x[:, 1]-point_cloud.np_phi(x[:, 0])[1])
+}
 
+# Compute FK statistics
+fk_stats_named = {
+    fname: {
+        method: np.mean(f(terminal_points[method]))
+        for method in terminal_points
+    }
+    for fname, f in test_functions_named.items()
+}
+
+# Display as DataFrame
+df_fk = pd.DataFrame(fk_stats_named).T  # transpose to have functions as rows
+df_fk.index.name = "Test Function"
+df_fk.columns.name = "Method"
+print(df_fk.round(13))

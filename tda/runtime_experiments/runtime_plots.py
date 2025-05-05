@@ -82,7 +82,7 @@ def plot_runtime_vs_n(n_values, pair_times, triple_times, solvers, log=False):
 def main():
     eps = 0.01
     # Define a list of n values. Be cautious: triple tests scale as O(n^3)
-    n_values = [5, 10, 20, 30, 50, 100]
+    n_values = [5, 10, 20, 30, 50]
     # The only relevant ones are SLSQP, trust_constr, and COB-...
     solvers = ["SLSQP"]
     pair_times = np.zeros((len(n_values), len(solvers)))

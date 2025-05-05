@@ -180,7 +180,7 @@ class GeometryError:
         fig = plt.figure()
         for name in self.ae_dict.keys():
             plt.plot(epsilons, model_drift_losses[name], label=f"{name} drift loss")
-        plt.plot(epsilons, ambient_drift_losses, linestyle="--", label="Ambient drift loss", color="black")
+        # plt.plot(epsilons, ambient_drift_losses, linestyle="--", label="Ambient drift loss", color="black")
         plt.xlabel("Epsilon")
         plt.ylabel("Drift Loss")
         plt.title("Drift Loss vs Epsilon")
@@ -193,7 +193,7 @@ class GeometryError:
         fig = plt.figure()
         for name in self.ae_dict.keys():
             plt.plot(epsilons, model_diffusion_losses[name], label=f"{name} diffusion loss")
-        plt.plot(epsilons, ambient_diffusion_losses, linestyle="--", label="Ambient diffusion loss", color="black")
+        # plt.plot(epsilons, ambient_diffusion_losses, linestyle="--", label="Ambient diffusion loss", color="black")
         plt.xlabel("Epsilon")
         plt.ylabel("Diffusion Loss")
         plt.title("Diffusion Loss vs Epsilon")

@@ -408,7 +408,7 @@ class SDEtorch:
                 x[i + 1] = decoded
         return x
 
-    def sample_ensemble(self, x0, tn, ntime=100, npaths=5, t0=0.0, noise_dim=None, device=None, dtype=torch.float32):
+    def sample_ensemble1(self, x0, tn, ntime=100, npaths=5, t0=0.0, noise_dim=None, device=None, dtype=torch.float32):
         """
         Generate an ensemble of sample paths.
 
@@ -432,6 +432,46 @@ class SDEtorch:
         for i in range(npaths):
             paths[i] = self.solve(x0, tn, ntime, t0, seed=None, noise_dim=noise_dim, device=device, dtype=dtype)
         return paths
+
+    def solve_batch(self, x0, tn, ntime=100, t0=0.0, npaths=1, seed=None, noise_dim=None, device=None,
+                    dtype=torch.float32):
+        """
+        Vectorized Euler-Maruyama integrator for a batch of SDE paths.
+        :param x0: initial state (1D tensor of shape (d,))
+        :param npaths: number of sample paths
+        :return: tensor of shape (npaths, ntime+1, d)
+        """
+        device = device or x0.device
+        x0 = x0.to(dtype=dtype, device=device)
+        d = x0.shape[0]
+        noise_dim = noise_dim or d
+        h = (tn - t0) / ntime
+
+        xs = torch.zeros((npaths, ntime + 1, d), dtype=dtype, device=device)
+        xs[:, 0, :] = x0.unsqueeze(0).repeat(npaths, 1)
+
+        if seed is not None:
+            gen = torch.Generator(device=device).manual_seed(seed)
+        else:
+            gen = torch.Generator(device=device).manual_seed(torch.seed())
+
+        for t in range(ntime):
+            t_i = t0 + t * h
+            x_t = xs[:, t, :]
+
+            drift = torch.stack([self.mu(t_i, x_t[i]) for i in range(npaths)])
+            sigma = torch.stack([self.sigma(t_i, x_t[i]) for i in range(npaths)])  # shape (npaths, d, noise_dim)
+            dB = torch.randn((npaths, noise_dim, 1), generator=gen, dtype=dtype, device=device) * torch.sqrt(
+                torch.tensor(h, dtype=dtype, device=device))
+            delta_x = drift * h + torch.bmm(sigma, dB).squeeze(-1)
+
+            xs[:, t + 1, :] = x_t + delta_x  # TODO: implement projection; this was changed for first passage time testing
+
+        return xs
+
+    def sample_ensemble(self, x0, tn, ntime=100, npaths=5, t0=0.0, noise_dim=None, device=None, dtype=torch.float32):
+        return self.solve_batch(x0, tn, ntime=ntime, t0=t0, npaths=npaths, noise_dim=noise_dim, device=device,
+                                dtype=dtype)
 
     # TODO: edit this to integrate it
     def euclidean_optimal_projection_to_manifold(self, x0, n_iterations=1):
