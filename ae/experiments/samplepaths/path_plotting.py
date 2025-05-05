@@ -126,7 +126,8 @@ class SamplePathPlotter:
             ax1 = fig.add_subplot(1, 2, 1)
             gt = model_data["Ground Truth"]
             for model_name, values in model_data.items():
-                ax1.plot(time_grid, values.cpu().detach(), label=model_name, color=colors[model_name])
+                if model_name != "Ambient Model":
+                    ax1.plot(time_grid, values.cpu().detach(), label=model_name, color=colors[model_name])
             ax1.set_xlabel("Time")
             ax1.set_ylabel(f"E[{fname}(X_t) | X_0]")
             ax1.set_title(f"{fname}")
@@ -136,7 +137,7 @@ class SamplePathPlotter:
             # Plot squared errors
             ax2 = fig.add_subplot(1, 2, 2)
             for model_name, values in model_data.items():
-                if model_name != "Ground Truth":  # Skip ground truth in error plot
+                if model_name != "Ground Truth" and model_name != "Ambient Model":  # Skip ground truth in error plot
                     ax2.plot(time_grid, (np.array(values.cpu().detach()) - np.array(gt.cpu().detach())) ** 2, label=model_name, color=colors[model_name])
             ax2.set_xlabel("Time")
             ax2.set_ylabel("MSE")

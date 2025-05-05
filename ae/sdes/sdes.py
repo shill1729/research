@@ -408,7 +408,7 @@ class SDEtorch:
                 x[i + 1] = decoded
         return x
 
-    def sample_ensemble1(self, x0, tn, ntime=100, npaths=5, t0=0.0, noise_dim=None, device=None, dtype=torch.float32):
+    def sample_ensemble(self, x0, tn, ntime=100, npaths=5, t0=0.0, noise_dim=None, device=None, dtype=torch.float32):
         """
         Generate an ensemble of sample paths.
 
@@ -469,7 +469,7 @@ class SDEtorch:
 
         return xs
 
-    def sample_ensemble(self, x0, tn, ntime=100, npaths=5, t0=0.0, noise_dim=None, device=None, dtype=torch.float32):
+    def sample_ensemble2(self, x0, tn, ntime=100, npaths=5, t0=0.0, noise_dim=None, device=None, dtype=torch.float32):
         return self.solve_batch(x0, tn, ntime=ntime, t0=t0, npaths=npaths, noise_dim=noise_dim, device=device,
                                 dtype=dtype)
 

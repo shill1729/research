@@ -89,17 +89,17 @@ class DynamicsError:
         """
         return [
             ("l2 norm", lambda paths: torch.linalg.vector_norm(paths, axis=2, ord=2)),
-            ("xyz", lambda paths: paths[:, :, 0]*paths[:, :, 1]*paths[:, :, 2]),
+            # ("xyz", lambda paths: paths[:, :, 0]*paths[:, :, 1]*paths[:, :, 2]),
             ("x^2", lambda paths: paths[..., 0] ** 2),
-            ("x^3", lambda paths: paths[..., 0] ** 3),
-            ("y^2", lambda paths: paths[..., 1] ** 2),
-            ("y^3", lambda paths: paths[..., 1] ** 3),
-            ("z^2", lambda paths: paths[..., 2] ** 2),
-            ("z^3", lambda paths: paths[..., 2] ** 3),
+            # ("x^3", lambda paths: paths[..., 0] ** 3),
+            # ("y^2", lambda paths: paths[..., 1] ** 2),
+            # ("y^3", lambda paths: paths[..., 1] ** 3),
+            # ("z^2", lambda paths: paths[..., 2] ** 2),
+            # ("z^3", lambda paths: paths[..., 2] ** 3),
             ("Manifold constraint", self.chart_error_vectorized),
-            ("x1", lambda paths: paths[:, :, 0]),
-            ("x2", lambda paths: paths[:, :, 1]),
-            ("x3", lambda paths: paths[:, :, 2])
+            # ("x1", lambda paths: paths[:, :, 0]),
+            # ("x2", lambda paths: paths[:, :, 1]),
+            # ("x3", lambda paths: paths[:, :, 2])
         ]
 
     def analyze_statistical_properties(self, paths_ground_truth, paths_ambient, paths_ae, tn):

@@ -17,8 +17,8 @@ show_stats = True
 project = True
 eps_grid_size = 10
 num_test = 20000
-h = 0.001
-n_paths = 30
+h = 0.01
+n_paths = 1000
 # Define a list of time horizons to test
 time_horizons = [0.5]
 
