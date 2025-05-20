@@ -50,7 +50,7 @@ if __name__ == "__main__":
     tangent_angle_weight2 = 0.02 # the first order weight for the second order model, if accumulating penalties
     tangent_drift_weight = 0.02
     surface = RationalSurface()
-    dynamics = LangevinHarmonicOscillator()
+    dynamics = RiemannianBrownianMotion()
     if embed:
         extrinsic_dim = large_dim
 

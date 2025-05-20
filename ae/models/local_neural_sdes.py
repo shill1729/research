@@ -42,8 +42,18 @@ class LatentNeuralSDE(nn.Module):
         neurons_sigma = [intrinsic_dim] + h2 + [intrinsic_dim ** 2]
         activations_mu = [drift_act for _ in range(len(neurons_mu) - 2)] + [encoder_act]
         activations_sigma = [diffusion_act for _ in range(len(neurons_sigma) - 2)] + [encoder_act]
-        self.drift_net = FeedForwardNeuralNet(neurons_mu, activations_mu, normalize=True)
-        self.diffusion_net = FeedForwardNeuralNet(neurons_sigma, activations_sigma, normalize=True)
+        self.drift_net = FeedForwardNeuralNet(neurons_mu,
+                                              activations_mu,
+                                              spectral_normalize=False,
+                                              weight_normalize=False,
+                                              fro_normalize=False,
+                                              fro_max_norm=10.)
+        self.diffusion_net = FeedForwardNeuralNet(neurons_sigma,
+                                                  activations_sigma,
+                                                  spectral_normalize=False,
+                                                  weight_normalize=False,
+                                                  fro_normalize=False,
+                                                  fro_max_norm=10.)
 
     def diffusion(self, z: Tensor) -> Tensor:
         """

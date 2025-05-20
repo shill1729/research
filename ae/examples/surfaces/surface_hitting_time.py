@@ -24,22 +24,22 @@ diff_layers = [32]
 lr = 0.001
 weight_decay = 0.
 batch_size = 20
-n_train = 30
+n_train = 50
 # training epochs
 print_freq = 1000
-epochs_ae = 9000
-epochs_diffusion = 9000
-epochs_drift = 9000
+epochs_ae = 10000
+epochs_diffusion = 2000
+epochs_drift = 2000
 # Paths
-tn = 1.
-ntime = 100
-npaths = 1000
+tn = 1
+ntime = 500
+npaths = 2000
 # Penalties
-tangent_angle_weight = 0.01
-tangent_drift_weight = 0.01
+tangent_angle_weight = 0.02
+tangent_drift_weight = 0.02
 diffeo_weight = 0.2
-bd = np.array([0.02, 0.02])
-hit_radius = 0.01
+bd = np.array([0.95, -0.95])
+hit_radius = 0.018
 # Time grid
 time_grid = np.linspace(0, tn, ntime+1)
 
@@ -284,4 +284,27 @@ ax2.legend()
 ax2.grid(linestyle="--", alpha=0.6)
 plt.tight_layout()
 # plt.savefig("curve_plots/hitting_time_kde_comparison_bellcurve5.png")
+plt.show()
+
+# --- Plot Empirical Survival Function ---
+fig, ax = plt.subplots(figsize=(8, 5))
+
+def plot_survival(hit_times, hit_mask, label, color):
+    times = np.sort(hit_times[hit_mask])
+    if len(times) > 0:
+        survival = 1 - np.arange(1, len(times) + 1) / len(times)
+        ax.step(times, survival, where='post', label=label, color=color, linewidth=2)
+    else:
+        ax.axhline(1.0, linestyle="--", color=color, label=f"{label} (no hits)")
+
+plot_survival(gt_hit, gt_mask, "Ground Truth", "green")
+plot_survival(van_hit, van_mask, "Vanilla AE-SDE", "red")
+plot_survival(pen_hit, pen_mask, "Penalized AE-SDE", "blue")
+
+ax.set_xlabel("Hitting Time")
+ax.set_ylabel("Survival Probability")
+ax.set_title("Empirical Survival Function of Hitting Times")
+ax.grid(linestyle="--", alpha=0.6)
+ax.legend()
+plt.tight_layout()
 plt.show()

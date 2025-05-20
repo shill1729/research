@@ -22,7 +22,11 @@ class AmbientDriftNetwork(nn.Module):
         # Drift architecture
         drift_neurons = [input_dim] + hidden_dims + [output_dim]
         drift_acts = [drift_act] * len(hidden_dims) + [None]
-        self.drift = FeedForwardNeuralNet(drift_neurons, drift_acts, normalize=True)
+        self.drift = FeedForwardNeuralNet(drift_neurons, drift_acts,
+                                          spectral_normalize=True,
+                                          weight_normalize=False,
+                                          fro_normalize=False,
+                                          fro_max_norm=10.)
 
     def forward(self, z):
         return self.drift.forward(z)
@@ -52,7 +56,11 @@ class AmbientDiffusionNetwork(nn.Module):
         # Diffusion architecture
         diffusion_neurons = [input_dim] + hidden_dims + [output_dim*output_dim]
         diffusion_acts = [diffusion_act] * len(hidden_dims) + [None]
-        self.diffusion = FeedForwardNeuralNet(diffusion_neurons, diffusion_acts, normalize=True)
+        self.diffusion = FeedForwardNeuralNet(diffusion_neurons, diffusion_acts,
+                                              spectral_normalize=True,
+                                              weight_normalize=False,
+                                              fro_normalize=False,
+                                              fro_max_norm=10.)
 
     def forward(self, z):
         return self.diffusion.forward(z).view((z.size(0), self.output_dim, self.output_dim))

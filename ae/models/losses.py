@@ -96,7 +96,7 @@ class MatrixMSELoss(nn.Module):
         Compute the mean square error between two matrices under any matrix-norm.
     """
 
-    def __init__(self, norm="fro", *args, **kwargs):
+    def __init__(self, norm, *args, **kwargs):
         """
             Compute the mean square error between two matrices under any matrix-norm.
 
@@ -452,7 +452,7 @@ class TotalLoss(nn.Module):
         return total_loss
 
 
-class LocalDiffusionLoss(nn.Module):
+class LocalCovarianceLoss(nn.Module):
     """
         A custom loss function for training an AutoEncoderDiffusion model. This loss combines several components:
         - Mean squared error (MSE) between the predicted covariance and the target covariance.
@@ -477,14 +477,14 @@ class LocalDiffusionLoss(nn.Module):
             Function used to calculate the tangent drift loss component.
     """
 
-    def __init__(self, norm="fro"):
+    def __init__(self, norm):
         """
 
         :param tangent_drift_weight: weight for the tangent drift alignment penalty
         :param norm: matrix norm for the covariance error
         """
         super().__init__()
-        self.cov_mse = MatrixMSELoss(norm=norm)
+        self.cov_mse = MatrixMSELoss(norm="fro")
 
     # TODO: rename "encoded_cov" to "ambient_cov"
     def forward(self, ae_diffusion: AutoEncoderDiffusion, x: Tensor, encoded_cov: Tensor):
@@ -562,11 +562,6 @@ class LocalDriftLoss(nn.Module):
         loss : Tensor
             The computed loss combining ambient drift error and latent drift error.
         """
-        # TODO: currently trying to decide between AE-SDE latent drift MSE or ambient drift MSE
-        # TODO: also consider using the encoded observed covariance instead of the pre-trained network bb^T to compute
-        #  q the correction from Ito's
-        # This code uses the latent diffusion model for q
-        # z, _, _, q = ae_diffusion.compute_sde_manifold_tensors(x)
         observed_ambient_drift, cov = targets
         # This code uses the encoded covariance from the AE
         z = ae_diffusion.autoencoder.encoder(x)
@@ -580,13 +575,4 @@ class LocalDriftLoss(nn.Module):
         observed_latent_drift = torch.bmm(dpi, tangent_drift_vector.unsqueeze(2)).squeeze(2)
         latent_sq_error = torch.linalg.vector_norm(model_latent_drift - observed_latent_drift, ord=2, dim=1) ** 2
         latent_drift_mse = torch.mean(latent_sq_error)
-        # jacobian = ae_diffusion.latent_sde.drift_net.jacobian_network(z)
-        # weight_matrix_reg = torch.linalg.matrix_norm(jacobian, ord="fro").mean(dim=0)
         return latent_drift_mse
-
-        # TODO: pick between local and ambient drift
-        # model_ambient_drift = ae_diffusion.compute_ambient_drift(x)
-        # ambient_drift_error = torch.linalg.vector_norm(model_ambient_drift - observed_ambient_drift, dim=1, ord=2)
-        # mse = torch.mean(ambient_drift_error, dim=0)
-        # return mse
-

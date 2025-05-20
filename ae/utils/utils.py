@@ -14,6 +14,17 @@ import torch
 import numpy as np
 from torch import nn
 
+class FrobeniusClipParametrization(nn.Module):
+    def __init__(self, max_norm: float):
+        super().__init__()
+        self.max_norm = max_norm
+
+    def forward(self, X):
+        frob_norm = torch.norm(X, p='fro')
+        if frob_norm > self.max_norm:
+            X = X * (self.max_norm / frob_norm)
+        return X
+
 
 def random_rotation_matrix(D, seed=None):
     A = np.random.default_rng(seed).standard_normal((D, D))

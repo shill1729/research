@@ -73,6 +73,7 @@ print("Jacobian:", jacobian)
 ```
 
 ### Basic training run for SDE-penalized autoencoders
+
 ```python
 # We visualize the true sample paths against hte model on the neural surface
 import torch
@@ -89,7 +90,7 @@ from ae.toydata.surfaces import *
 from ae.models.autoencoder import AutoEncoder
 from ae.models.local_neural_sdes import LatentNeuralSDE, AutoEncoderDiffusion
 # Loss imports
-from ae.models.losses import LossWeights, TotalLoss, LocalDiffusionLoss, LocalDriftLoss
+from ae.models.losses import LossWeights, TotalLoss, LocalCovarianceLoss, LocalDriftLoss
 # Pre-training/traing and performance imports
 from ae.utils import process_data
 from ae.models.fitting import ThreeStageFit
@@ -178,7 +179,7 @@ x_test, mu_test, cov_test, p_test, _, orthonormal_frame_test = process_data(x_te
 # Print post-training losses on the testing set for the AE
 print("\nTesting-set losses for the Autoencoder:")
 ae_loss = TotalLoss(weights, norm)
-diffusion_loss = LocalDiffusionLoss(norm)
+diffusion_loss = LocalCovarianceLoss(norm)
 drift_loss = LocalDriftLoss()
 test_ae_losses = compute_test_losses(ae_diffusion,
                                      ae_loss,

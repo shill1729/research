@@ -17,10 +17,10 @@ show_stats = True
 project = True
 eps_grid_size = 10
 num_test = 20000
-h = 0.01
+h = 0.001
 n_paths = 1000
 # Define a list of time horizons to test
-time_horizons = [0.5]
+time_horizons = [1.]
 
 
 # Load the pre-trained model: note working directory is currently ae/experiments

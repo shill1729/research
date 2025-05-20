@@ -152,7 +152,7 @@ class DeepParaboloid(SurfaceBase):
 
 
 class ProductSurface(SurfaceBase):
-    def __init__(self, a=4):
+    def __init__(self, a=2):
         super().__init__()
         self.a = a
 

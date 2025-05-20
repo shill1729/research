@@ -11,7 +11,10 @@ from typing import List, Callable, Optional, Any
 
 import torch
 import torch.nn as nn
+import torch.nn.utils.parametrize as parametrize
+
 from torch import Tensor
+from ae.utils import FrobeniusClipParametrization
 
 
 class FeedForwardNeuralNet(nn.Module):
@@ -48,27 +51,40 @@ class FeedForwardNeuralNet(nn.Module):
 
     """
 
-    def __init__(self, neurons: List[int], activations: List[Optional[Callable[..., Any]]], normalize=False):
+    def __init__(self, neurons: List[int], activations: List[Optional[Callable[..., Any]]], spectral_normalize=False,
+                 weight_normalize=False, fro_normalize=False, fro_max_norm=5.):
         """
         Initializes the FeedForwardNeuralNet with the given neurons and activation functions.
 
         Args:
             neurons (list): A list of integers where each integer represents the number of nodes in a layer.
             activations (callable): The list of activation functions to apply after each linear layer
-            normalize (bool): A boolean for whether to apply spectral normalization to the layers.
+            spectral_normalize (bool): A boolean for whether to apply spectral normalization to the layers.
         """
         super(FeedForwardNeuralNet, self).__init__()
         self.layers = nn.ModuleList()
         self.activations = activations
         self.input_dim = neurons[0]
         self.output_dim = neurons[-1]
-        self.normalize = normalize
+        self.spectral_normalize = spectral_normalize
+        self.weight_normalize = weight_normalize
+        self.fro_normalize = fro_normalize
+        self.fro_max_norm = fro_max_norm
 
         for i in range(len(neurons) - 1):
             layer = nn.Linear(neurons[i], neurons[i + 1])
             # Apply spectral normalization if specified
-            if normalize:
-                layer = nn.utils.spectral_norm(layer)
+            if self.spectral_normalize:
+                # Torch documentation say nn.utils.spectral_norm is to be deprecated
+                # layer = nn.utils.spectral_norm(layer)
+                layer = nn.utils.parametrizations.spectral_norm(layer)
+            if self.weight_normalize:
+                layer = nn.utils.parametrizations.weight_norm(layer)
+            if self.fro_normalize:
+                parametrize.register_parametrization(
+                    layer, 'weight',
+                    FrobeniusClipParametrization(self.fro_max_norm)
+                )
             self.layers.append(layer)
 
     def forward(self, x: Tensor) -> Tensor:

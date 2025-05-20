@@ -4,7 +4,7 @@ import torch
 from torch import nn, Tensor
 from torch.utils.data import DataLoader, TensorDataset
 from ae.models import AutoEncoderDiffusion
-from ae.models.losses import TotalLoss, LocalDiffusionLoss, LocalDriftLoss, LossWeights
+from ae.models.losses import TotalLoss, LocalCovarianceLoss, LocalDriftLoss, LossWeights
 from ae.utils import set_grad_tracking
 
 
@@ -72,10 +72,16 @@ def fit_model(model: nn.Module,
             loss_value.backward()
             optimizer.step()
             epoch_loss += loss_value.item()  # Accumulate batch loss into epoch loss
+
+
         # Print average loss for the epoch if print_freq is met
         if epoch % print_freq == 0:
             # print(f'Epoch: {epoch}: Train-Loss: {epoch_loss / len(dataloader):.6f}')
-            print(f'Epoch: {epoch}: Train-Loss: {epoch_loss:.6f}')
+            # print(f'Epoch: {epoch}: Train-Loss: {epoch_loss:.6f}')
+            total_batches = len(dataloader)
+            mean_mse = epoch_loss / total_batches
+            rmse = mean_mse ** 0.5
+            print(f'Epoch {epoch}: RMSE: {rmse:.6f}')
     return None
 
 
@@ -92,7 +98,7 @@ class ThreeStageFit:
     def three_stage_fit(self, ae_diffusion: AutoEncoderDiffusion, weights: LossWeights, x, mu, cov, p, orthonormal_frame, anneal_weights=None, norm="fro", device="cpu"):
         ae_loss = TotalLoss(weights, norm, device)
         ae_diffusion.to(device)
-        diffusion_loss = LocalDiffusionLoss(norm).to(device)
+        diffusion_loss = LocalCovarianceLoss(norm).to(device)
         drift_loss = LocalDriftLoss().to(device)
 
         # Train the AE.

@@ -47,8 +47,8 @@ class AutoEncoder(nn.Module):
         encoder_acts = [encoder_act] * (len(hidden_dims) + 1)
         # The decoder has no final activation, so it can target anything in the ambient space
         decoder_acts = [decoder_act] * len(hidden_dims) + [None]
-        self.encoder = FeedForwardNeuralNet(encoder_neurons, encoder_acts, normalize=False)
-        self.decoder = FeedForwardNeuralNet(decoder_neurons, decoder_acts, normalize=False)
+        self.encoder = FeedForwardNeuralNet(encoder_neurons, encoder_acts)
+        self.decoder = FeedForwardNeuralNet(decoder_neurons, decoder_acts)
         # Tie the weights of the decoder to be the transpose of the encoder, in reverse due
         self.decoder.tie_weights(self.encoder)
 

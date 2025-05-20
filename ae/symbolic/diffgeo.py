@@ -40,7 +40,8 @@ class RiemannianManifold:
         Returns:
             Matrix: The Jacobian matrix of the chart.
         """
-        return sp.simplify(self.chart.jacobian(self.local_coordinates))
+        m = sp.simplify(self.chart.jacobian(self.local_coordinates))
+        return Matrix(m)
 
     def implicit_function(self):
         if len(self.chart) == 2:
@@ -63,7 +64,7 @@ class RiemannianManifold:
         """
         j = self.chart_jacobian()
         g = j.T * j
-        return sp.simplify(g)
+        return Matrix(sp.simplify(g))
 
     def volume_density(self) -> sp.Expr:
         """
@@ -91,11 +92,11 @@ class RiemannianManifold:
         g = self.metric_tensor()
         g_inv = g.inv()
         if method == "pow":
-            return sp.simplify(g_inv.pow(1 / 2))
+            return Matrix(sp.simplify(g_inv.pow(1 / 2)))
         elif method == "svd":
             u, s, v = sp.Matrix(g_inv).singular_value_decomposition()
             sqrt_g_inv = u * sp.sqrt(s) * v
-            return sp.simplify(sqrt_g_inv)
+            return Matrix(sp.simplify(sqrt_g_inv))
         else:
             raise ValueError("argument 'method' must be 'pow' or 'svd'.")
 
@@ -111,7 +112,7 @@ class RiemannianManifold:
         """
         j = self.chart_jacobian()
         e = self.g_orthonormal_frame(method)
-        return sp.simplify(j * e)
+        return Matrix(sp.simplify(j * e))
 
     def orthogonal_projection(self, method: str = "pow") -> Matrix:
         """
@@ -124,7 +125,7 @@ class RiemannianManifold:
             Matrix: The orthogonal projection.
         """
         h = self.orthonormal_frame(method)
-        return sp.simplify(h * h.T)
+        return Matrix(sp.simplify(h * h.T))
 
     def manifold_divergence(self, f: Matrix) -> sp.Expr:
         """
@@ -137,7 +138,7 @@ class RiemannianManifold:
             sp.Expr: The manifold divergence.
         """
         vol_den = self.volume_density()
-        scaled_field = sp.simplify(vol_den * f)
+        scaled_field = Matrix(sp.simplify(vol_den * f))
         manifold_div = matrix_divergence(scaled_field, self.local_coordinates) / vol_den
         return sp.simplify(manifold_div)
 
@@ -149,9 +150,9 @@ class RiemannianManifold:
             Matrix: The local Brownian motion drift.
         """
         # print("Inverting metric tensor...")
-        g_inv = sp.simplify(self.metric_tensor().inv())
+        g_inv = Matrix(sp.simplify(self.metric_tensor().inv()))
         # print("Computing manifold divergence of g^{-1}...")
-        return sp.simplify(self.manifold_divergence(g_inv) / 2)
+        return Matrix(sp.simplify(self.manifold_divergence(g_inv) / 2))
 
     def local_bm_diffusion(self, method: str = "pow") -> Matrix:
         """
@@ -163,7 +164,7 @@ class RiemannianManifold:
         Returns:
             Matrix: The local Brownian motion diffusion.
         """
-        return sp.simplify(self.g_orthonormal_frame(method))
+        return Matrix(sp.simplify(self.g_orthonormal_frame(method)))
 
     def christoffel_symbols(self) -> MutableDenseNDimArray:
         """
@@ -227,7 +228,7 @@ class RiemannianManifold:
             for j in range(n):
                 Ric[i, j] = sum(R[k, i, k, j] for k in range(n))
 
-        return sp.simplify(Ric)
+        return MutableDenseNDimArray(sp.simplify(Ric))
 
     def scalar_curvature(self) -> sp.Expr:
         """
@@ -238,8 +239,8 @@ class RiemannianManifold:
         """
         Ric = self.ricci_curvature_tensor()
         g_inv = self.metric_tensor().inv()
-        return sp.simplify(sum(Ric[i, j] * g_inv[i, j] for i in range(len(self.local_coordinates)) for j in
-                               range(len(self.local_coordinates))))
+        sc = sp.simplify(sum(Ric[i, j] * g_inv[i, j] for i in range(len(self.local_coordinates)) for j in range(len(self.local_coordinates))))
+        return sc
 
     def sectional_curvature(self, u: Matrix, v: Matrix) -> sp.Expr:
         """
@@ -281,7 +282,7 @@ class RiemannianManifold:
             for j in range(n):
                 for k in range(n):
                     result[i] += gamma[i, j, k] * vector_field[j] * vector_field[k]
-        return sp.simplify(result)
+        return MutableDenseNDimArray(sp.simplify(result))
 
     def geodesic_equations(self) -> List[sp.Expr]:
         """
@@ -323,7 +324,7 @@ class RiemannianManifold:
             result[i] = sum(X[j] * Y[i].diff(self.local_coordinates[j]) -
                             Y[j] * X[i].diff(self.local_coordinates[j])
                             for j in range(n))
-        return sp.simplify(result)
+        return MutableDenseNDimArray(sp.simplify(result))
 
     def covariant_derivative(self, X: Matrix, Y: Matrix) -> MutableDenseNDimArray:
         """
@@ -345,7 +346,7 @@ class RiemannianManifold:
                             for j in range(n))
             result[i] += sum(gamma[i, j, k] * X[j] * Y[k]
                              for j in range(n) for k in range(n))
-        return sp.simplify(result)
+        return MutableDenseNDimArray(sp.simplify(result))
 
     def parallel_transport(self, v: Matrix, curve: Matrix) -> List[sp.Expr]:
         """
@@ -390,6 +391,44 @@ class RiemannianManifold:
         sde = SDE(drift, diffusion)
         return sde
 
+    def create_local_bm_sde2(self) -> SDE:
+        mu_sym = self.sympy_to_numpy(self.local_bm_drift())
+        sigma_sym = self.sympy_to_numpy(self.local_bm_diffusion())
+        coord_dim = len(self.local_coordinates)
+
+        def drift(t, x):
+            x = np.atleast_2d(x)  # shape (batch, d)
+            if x.shape[1] != coord_dim:
+                raise ValueError(f"Input dimension mismatch: expected {coord_dim}, got {x.shape[1]}")
+            args = [x[:, i] for i in range(coord_dim)]
+            mu_components = mu_sym(*args)
+            # Ensure mu_components is always a tuple of arrays
+            if not isinstance(mu_components, (tuple, list)):
+                mu_components = (mu_components,)
+            return np.stack(mu_components, axis=1)  # shape (batch, d)
+
+        def diffusion(t, x):
+            x = np.atleast_2d(x)  # shape (batch_size, d)
+            batch_size = x.shape[0]
+            args = [x[:, i] for i in range(coord_dim)]  # List of arrays, each shape (batch_size,)
+
+            sigma_components = sigma_sym(
+                *args)  # Should return a tuple/list of length d, each entry shape (noise_dim, batch_size) or something similar
+
+            # Handle the case where sigma_sym returns a flat array instead of a structured one
+            sigma_arr = np.array(sigma_components)
+
+            # If sigma_arr.shape looks like (d, noise_dim, batch), we want to transpose it to (batch, d, noise_dim)
+            if sigma_arr.shape[0] == coord_dim and sigma_arr.shape[-1] == batch_size:
+                sigma_arr = np.transpose(sigma_arr, (2, 0, 1))  # (batch, d, noise_dim)
+            else:
+                raise ValueError(
+                    f"Unexpected shape from sigma_sym: {sigma_arr.shape}. Expected leading dim {coord_dim} and trailing dim {batch_size}.")
+
+            return sigma_arr
+
+        return SDE(drift, diffusion)
+
     def lift_paths(self, local_paths):
         chart_np = self.sympy_to_numpy(self.chart)
         npaths, ntime, d = local_paths.shape
@@ -409,6 +448,7 @@ class RiemannianManifold:
         :param npaths: number of sample paths
         :return: tuple of local ensemble paths and global ensemble paths
         """
+        # TODO: figure out which one to use sde2 or sde
         sde = self.create_local_bm_sde()
         local_paths = sde.sample_ensemble(x0, tn, ntime, npaths)
         global_paths = self.lift_paths(local_paths)

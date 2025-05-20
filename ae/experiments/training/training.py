@@ -12,7 +12,7 @@ from ae.models.autoencoder import AutoEncoder
 from ae.models.fitting import ThreeStageFit, fit_model
 from ae.models.local_neural_sdes import LatentNeuralSDE, AutoEncoderDiffusion
 from ae.models.losses import AmbientDriftLoss, AmbientDiffusionLoss
-from ae.models.losses import LossWeights, LocalDiffusionLoss, LocalDriftLoss
+from ae.models.losses import LossWeights, LocalCovarianceLoss, LocalDriftLoss
 from ae.toydata.surfaces import SurfaceBase
 from ae.toydata.local_dynamics import DynamicsBase
 

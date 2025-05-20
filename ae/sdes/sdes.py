@@ -113,6 +113,8 @@ class SDE:
         self.mu = mu
         self.sigma = sigma
 
+
+
     def solve(self, x0, tn, ntime=100, t0=0., seed=None, noise_dim=None):
         """
         Solve a generic SDE using Euler-Maruyama
@@ -141,7 +143,7 @@ class SDE:
             x[i + 1, :] = x[i, :] + drift * h + (diffusion @ db).reshape(d)
         return x
 
-    def sample_ensemble(self, x0, tn, ntime=100, npaths=5, t0=0., noise_dim=None):
+    def sample_ensemble_deprecated(self, x0, tn, ntime=100, npaths=5, t0=0., noise_dim=None):
         """
 
         :param x0: initial state
@@ -159,6 +161,50 @@ class SDE:
         for i in range(npaths):
             x[i, :, :] = self.solve(x0, tn, ntime, t0, None, noise_dim)
         return x
+
+    def sample_ensemble(self, x0, tn, ntime=100, npaths=5, t0=0., seed=None, noise_dim=None):
+        """
+        Vectorized ensemble sampler using Euler–Maruyama.
+
+        :param x0: initial state, shape (d,) or scalar
+        :param tn: terminal time
+        :param ntime: number of time steps
+        :param npaths: number of trajectories
+        :param t0: initial time
+        :param seed: RNG seed
+        :param noise_dim: dimension of Brownian noise (defaults to state dim)
+        :return: array of shape (npaths, ntime+1, d)
+        """
+        rng = np.random.default_rng(seed)
+        x0 = np.atleast_1d(x0)
+        d = x0.shape[0]
+        if noise_dim is None:
+            noise_dim = d
+
+        h = (tn - t0) / ntime
+        times = t0 + h * np.arange(ntime)
+
+        # Pre-allocate solution array
+        X = np.empty((npaths, ntime + 1, d))
+        X[:, 0, :] = x0
+
+        # Draw all Brownian increments at once: shape (npaths, ntime, noise_dim)
+        dB = rng.normal(scale=np.sqrt(h), size=(npaths, ntime, noise_dim))
+        drift = np.zeros((npaths, d))
+        diffusion = np.zeros((npaths, d, noise_dim))
+        for i, t in enumerate(times):
+            Xi = X[:, i, :]  # (npaths, d)
+            drift, diffusion = self.vectorize_coefficients_over_paths(drift, diffusion, Xi, npaths, t)
+            # Euler–Maruyama update for all paths:
+            X[:, i + 1, :] = Xi + drift * h + np.einsum('pij,pj->pi', diffusion, dB[:, i, :])
+        return X
+
+    def vectorize_coefficients_over_paths(self, drift, diffusion, Xi, npaths, t):
+        for j in range(npaths):
+            # TODO: let's just take autonomous SDE coefficients?
+            drift[j] = self.mu(t, Xi[j])
+            diffusion[j] = self.sigma(t, Xi[j])
+        return drift, diffusion
 
     def mc_pde_solve(self, t, x, f, h, tn, ntime=100, npaths=5, noise_dim=None):
         """
@@ -354,6 +400,13 @@ class SDEtorch:
         self.aedf = aedf
         self.ae_proj = ae_proj
 
+    def vectorize_coefficients_over_paths(self, drift, diffusion, Xi, npaths, t):
+        for j in range(npaths):
+            # TODO: let's just take autonomous SDE coefficients?
+            drift[j] = self.mu(t, Xi[j])
+            diffusion[j] = self.sigma(t, Xi[j])
+        return drift, diffusion
+
     def solve(self, x0, tn, ntime=100, t0=0.0, seed=None, noise_dim=None, device=None, dtype=torch.float32):
         """
         Euler-Maruyama integrator for the SDE.
@@ -408,7 +461,7 @@ class SDEtorch:
                 x[i + 1] = decoded
         return x
 
-    def sample_ensemble(self, x0, tn, ntime=100, npaths=5, t0=0.0, noise_dim=None, device=None, dtype=torch.float32):
+    def sample_ensemble_deprecated(self, x0, tn, ntime=100, npaths=5, t0=0.0, noise_dim=None, device=None, dtype=torch.float32):
         """
         Generate an ensemble of sample paths.
 
@@ -433,45 +486,64 @@ class SDEtorch:
             paths[i] = self.solve(x0, tn, ntime, t0, seed=None, noise_dim=noise_dim, device=device, dtype=dtype)
         return paths
 
-    def solve_batch(self, x0, tn, ntime=100, t0=0.0, npaths=1, seed=None, noise_dim=None, device=None,
-                    dtype=torch.float32):
+    def sample_ensemble(
+        self,
+        x0,
+        tn,
+        ntime=100,
+        npaths=5,
+        t0=0.0,
+        noise_dim=None,
+        device=None,
+        dtype=torch.float32,
+    ):
         """
-        Vectorized Euler-Maruyama integrator for a batch of SDE paths.
-        :param x0: initial state (1D tensor of shape (d,))
-        :param npaths: number of sample paths
-        :return: tensor of shape (npaths, ntime+1, d)
+        Vectorized Euler–Maruyama ensemble on a given torch device.
+
+        :param x0: initial state, Tensor of shape (d,) or shape (1, d)
+        :param tn: terminal time (float)
+        :param ntime: number of time steps (int)
+        :param npaths: number of sample paths (int)
+        :param t0: initial time (float)
+        :param noise_dim: dimension of Brownian noise (defaults to state dim)
+        :param device: torch device (e.g. torch.device('cuda') or 'cpu')
+        :param dtype: torch dtype (default float32)
+        :return: Tensor of shape (npaths, ntime+1, d)
         """
-        device = device or x0.device
-        x0 = x0.to(dtype=dtype, device=device)
+        device = device or torch.device('cpu')
+        # ensure x0 is a 1D tensor on correct device/dtype
+        x0 = torch.as_tensor(x0, device=device, dtype=dtype).flatten()
         d = x0.shape[0]
-        noise_dim = noise_dim or d
+        if noise_dim is None:
+            noise_dim = d
+
         h = (tn - t0) / ntime
+        # pre-allocate solution tensor
+        X = torch.empty((npaths, ntime + 1, d), device=device, dtype=dtype)
+        # set all initial states
+        X[:, 0, :] = x0.unsqueeze(0).expand(npaths, -1)
 
-        xs = torch.zeros((npaths, ntime + 1, d), dtype=dtype, device=device)
-        xs[:, 0, :] = x0.unsqueeze(0).repeat(npaths, 1)
+        # sample all Brownian increments at once
+        # shape: (npaths, ntime, noise_dim)
+        dB = torch.randn(npaths, ntime, noise_dim, device=device, dtype=dtype) * (h ** 0.5)
 
-        if seed is not None:
-            gen = torch.Generator(device=device).manual_seed(seed)
-        else:
-            gen = torch.Generator(device=device).manual_seed(torch.seed())
+        # time grid (we only need the time at each step)
+        times = t0 + torch.arange(ntime, device=device, dtype=dtype) * h
+        drift = torch.zeros((npaths, d))
+        diffusion = torch.zeros((npaths, d, noise_dim))
+        for i in range(ntime):
+            t = times[i].item()
+            Xi = X[:, i, :]  # (npaths, d)
 
-        for t in range(ntime):
-            t_i = t0 + t * h
-            x_t = xs[:, t, :]
+            # compute drift and diffusion for all paths
+            # mu: (npaths, d)
+            drift, diffusion = self.vectorize_coefficients_over_paths(drift, diffusion, Xi, npaths, t)
 
-            drift = torch.stack([self.mu(t_i, x_t[i]) for i in range(npaths)])
-            sigma = torch.stack([self.sigma(t_i, x_t[i]) for i in range(npaths)])  # shape (npaths, d, noise_dim)
-            dB = torch.randn((npaths, noise_dim, 1), generator=gen, dtype=dtype, device=device) * torch.sqrt(
-                torch.tensor(h, dtype=dtype, device=device))
-            delta_x = drift * h + torch.bmm(sigma, dB).squeeze(-1)
+            # Euler–Maruyama update: X_{i+1} = X_i + mu*h + sigma * dB
+            # einsum over noise_dim: (batch,d,n) * (batch,n) -> (batch,d)
+            X[:, i + 1, :] = Xi + drift * h + torch.einsum('bdn,bn->bd', diffusion, dB[:, i, :])
 
-            xs[:, t + 1, :] = x_t + delta_x  # TODO: implement projection; this was changed for first passage time testing
-
-        return xs
-
-    def sample_ensemble2(self, x0, tn, ntime=100, npaths=5, t0=0.0, noise_dim=None, device=None, dtype=torch.float32):
-        return self.solve_batch(x0, tn, ntime=ntime, t0=t0, npaths=npaths, noise_dim=noise_dim, device=device,
-                                dtype=dtype)
+        return X
 
     # TODO: edit this to integrate it
     def euclidean_optimal_projection_to_manifold(self, x0, n_iterations=1):
