@@ -88,9 +88,10 @@ from ae.toydata.local_dynamics import *
 from ae.toydata.surfaces import *
 # Model imports
 from ae.models.autoencoder import AutoEncoder
-from ae.models.local_neural_sdes import LatentNeuralSDE, AutoEncoderDiffusion
+from ae.models.sdes_latent import LatentNeuralSDE, AutoEncoderDiffusion
 # Loss imports
-from ae.models.losses import LossWeights, TotalLoss, LocalCovarianceLoss, LocalDriftLoss
+from ae.models.losses.losses_autoencoder import LossWeights, TotalLoss
+from ae.models import LocalCovarianceLoss, LocalDriftLoss
 # Pre-training/traing and performance imports
 from ae.utils import process_data
 from ae.models.fitting import ThreeStageFit

@@ -4,8 +4,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from tda.solvers.scipy_solver import minimize_K
+from tda.solvers.jumble import minimize_K_jw
 from tda.solvers.pgd import projected_gradient_descent
 from tda.solvers.cauchy_simplex_solver import cauchy_simplex_solver
+from tda.solvers.fw import minimize_K_fw
 from tda.toydata.pointclouds import generate_point_cloud_and_pd_matrices
 
 
@@ -28,12 +30,16 @@ def time_intersection_tests(n, eps=0.5, solver="SLSQP"):
         pts = np.array([x[i], x[j]])
         As = np.array([A_list[i], A_list[j]])
 
-        if solver != "cs" and solver != "pga":
+        if solver != "cs" and solver != "pga" and solver != "fw" and solver != "jw":
             _ = minimize_K(eps, pts, A_array=As, solver=solver)
         elif solver == "cs":
             _ = cauchy_simplex_solver(eps, pts, A_list=As)
         elif solver == "pga":
             _ = projected_gradient_descent(eps, pts, As)
+        elif solver == "fw":
+            _ = minimize_K_fw(eps, pts, As)
+        elif solver == "jw":
+            _ = minimize_K_jw(eps, pts, As)
         pair_count += 1
     end_pairs = time.perf_counter()
     pair_time = end_pairs - start_pairs
@@ -45,12 +51,18 @@ def time_intersection_tests(n, eps=0.5, solver="SLSQP"):
         pts = np.array([x[i], x[j], x[k]])
         As = np.array([A_list[i], A_list[j], A_list[k]])
 
-        if solver != "cs" and solver != "pga":
+        if solver != "cs" and solver != "pga" and solver != "fw" and solver != "jw":
             _ = minimize_K(eps, pts, A_array=As, solver=solver)
+            # print(a)
         elif solver == "cs":
             _ = cauchy_simplex_solver(eps, pts, A_list=As)
         elif solver == "pga":
             _ = projected_gradient_descent(eps, pts, As)
+        elif solver == "fw":
+            _ = minimize_K_fw(eps, pts, As)
+            # print(a)
+        elif solver == "jw":
+            _ = minimize_K_jw(eps, pts, As)
         triple_count += 1
     end_triples = time.perf_counter()
     triple_time = end_triples - start_triples
@@ -82,9 +94,9 @@ def plot_runtime_vs_n(n_values, pair_times, triple_times, solvers, log=False):
 def main():
     eps = 0.01
     # Define a list of n values. Be cautious: triple tests scale as O(n^3)
-    n_values = [5, 10, 20, 30, 50]
+    n_values = [5, 10, 20]
     # The only relevant ones are SLSQP, trust_constr, and COB-...
-    solvers = ["SLSQP"]
+    solvers = ["SLSQP", "jw"]
     pair_times = np.zeros((len(n_values), len(solvers)))
     triple_times = np.zeros((len(n_values), len(solvers)))
     print("Measuring runtimes for intersection tests:")

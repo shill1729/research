@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 n_test = 100
 
 # === Load paths ===
-save_dir = "saved_models/"
+save_dir = "saved_single_models/"
 model_path = os.path.join(save_dir, "aedf_model.pt")
 config_path = os.path.join(save_dir, "config.json")
 

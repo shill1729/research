@@ -7,11 +7,12 @@ from ae.sdes import SDE, SDEtorch
 from ae.toydata.curves import *
 from ae.toydata.surfaces import *
 from ae.toydata.local_dynamics import *
-from ae.toydata import RiemannianManifold, PointCloud, ProductSurface
+from ae.toydata import RiemannianManifold, PointCloud
 from ae.utils import process_data
-from ae.models import AutoEncoder, LatentNeuralSDE, AutoEncoderDiffusion, fit_model, ThreeStageFit
+from ae.models import fit_model
 from ae.models import LossWeights, AmbientDriftNetwork, AmbientDiffusionNetwork
-from ae.models.losses import AmbientDriftLoss, AmbientDiffusionLoss
+from ae.models.losses.losses_ambient import AmbientDriftLoss, AmbientCovarianceLoss
+
 # Model configuration parameters
 train_seed = None  # Set fixed seeds for reproducibility
 test_seed = None
@@ -76,7 +77,7 @@ x, mu, cov, p, n, h = process_data(x, mu, cov, d=intrinsic_dim)
 ambient_drift_model = AmbientDriftNetwork(extrinsic_dim, extrinsic_dim, drift_layers, drift_act)
 ambient_diff_model = AmbientDiffusionNetwork(extrinsic_dim, extrinsic_dim, diff_layers, diffusion_act)
 ambient_drift_loss = AmbientDriftLoss()
-ambient_diff_loss = AmbientDiffusionLoss()
+ambient_diff_loss = AmbientCovarianceLoss()
 
 # Local SDE models directly in intrinsic coordinates
 local_drift_model = AmbientDriftNetwork(intrinsic_dim, intrinsic_dim, drift_layers, drift_act)
@@ -99,7 +100,7 @@ a_targets = torch.tensor(a_targets, dtype=torch.float32)
 
 # Losses
 local_drift_loss = AmbientDriftLoss()
-local_diff_loss = AmbientDiffusionLoss()
+local_diff_loss = AmbientCovarianceLoss()
 
 print("Training ambient diffusion model")
 fit_model(ambient_diff_model, ambient_diff_loss, x, cov, lr, epochs_diffusion, print_freq, weight_decay, batch_size)

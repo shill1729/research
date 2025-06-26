@@ -1,12 +1,12 @@
 from ae.toydata import ToyData
-from ae.experiments import Trainer
-from ae.experiments.samplepaths import SamplePathGenerator
-from ae.experiments.samplepaths import SamplePathPlotter
-from ae.experiments.samplepaths import (feynman_kac_formula, compute_mean_sample_paths,
-                                                          compute_variance_sample_paths,
-                                                          compute_covariance_sample_paths, compute_increments,
-                                                          compute_norms, apply_function)
-from ae.experiments.training.helpers import get_time_horizon_name
+from ae.experiment_classes import Trainer
+from ae.experiment_classes.samplepaths import SamplePathGenerator
+from ae.experiment_classes.samplepaths import SamplePathPlotter
+from ae.experiment_classes.samplepaths import (feynman_kac_formula, compute_mean_sample_paths,
+                                               compute_variance_sample_paths,
+                                               compute_covariance_sample_paths, compute_increments,
+                                               compute_norms, apply_function)
+from ae.experiment_classes.training.helpers import get_time_horizon_name
 import numpy as np
 import torch
 
@@ -90,9 +90,9 @@ class DynamicsError:
         return [
             ("l2 norm", lambda paths: torch.linalg.vector_norm(paths, axis=2, ord=2)),
             # ("xyz", lambda paths: paths[:, :, 0]*paths[:, :, 1]*paths[:, :, 2]),
-            ("x^2", lambda paths: paths[..., 0] ** 2),
-            # ("x^3", lambda paths: paths[..., 0] ** 3),
-            # ("y^2", lambda paths: paths[..., 1] ** 2),
+            ("x", lambda paths: paths[..., 0]),
+            ("y", lambda paths: paths[..., 1]),
+            ("z", lambda paths: paths[..., 2]),
             # ("y^3", lambda paths: paths[..., 1] ** 3),
             # ("z^2", lambda paths: paths[..., 2] ** 2),
             # ("z^3", lambda paths: paths[..., 2] ** 3),

@@ -2,13 +2,9 @@
     A class implementation of a SDE using numpy.
 """
 from scipy.integrate import trapezoid
-from typing import Optional
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-
-
-# from ae.models import AutoEncoderDiffusion
 
 
 def plot_sample_path(t, x, ax: plt.Axes) -> None:
@@ -486,17 +482,7 @@ class SDEtorch:
             paths[i] = self.solve(x0, tn, ntime, t0, seed=None, noise_dim=noise_dim, device=device, dtype=dtype)
         return paths
 
-    def sample_ensemble(
-        self,
-        x0,
-        tn,
-        ntime=100,
-        npaths=5,
-        t0=0.0,
-        noise_dim=None,
-        device=None,
-        dtype=torch.float32,
-    ):
+    def sample_ensemble(self, x0, tn, ntime=100, npaths=5, t0=0.0, noise_dim=None, device="cpu", dtype=torch.float32):
         """
         Vectorized Euler–Maruyama ensemble on a given torch device.
 
@@ -508,9 +494,9 @@ class SDEtorch:
         :param noise_dim: dimension of Brownian noise (defaults to state dim)
         :param device: torch device (e.g. torch.device('cuda') or 'cpu')
         :param dtype: torch dtype (default float32)
+
         :return: Tensor of shape (npaths, ntime+1, d)
         """
-        device = device or torch.device('cpu')
         # ensure x0 is a 1D tensor on correct device/dtype
         x0 = torch.as_tensor(x0, device=device, dtype=dtype).flatten()
         d = x0.shape[0]
@@ -534,11 +520,9 @@ class SDEtorch:
         for i in range(ntime):
             t = times[i].item()
             Xi = X[:, i, :]  # (npaths, d)
-
             # compute drift and diffusion for all paths
             # mu: (npaths, d)
             drift, diffusion = self.vectorize_coefficients_over_paths(drift, diffusion, Xi, npaths, t)
-
             # Euler–Maruyama update: X_{i+1} = X_i + mu*h + sigma * dB
             # einsum over noise_dim: (batch,d,n) * (batch,n) -> (batch,d)
             X[:, i + 1, :] = Xi + drift * h + torch.einsum('bdn,bn->bd', diffusion, dB[:, i, :])

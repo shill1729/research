@@ -2,8 +2,8 @@ import torch
 from torch import Tensor
 import matplotlib.pyplot as plt
 
-from ae.models.local_neural_sdes import AutoEncoderDiffusion
-from ae.models.losses import TotalLoss
+from ae.models.sdes_latent import AutoEncoderDiffusion
+from ae.models.losses.losses_autoencoder import TotalLoss
 
 
 def compute_test_losses(ae_diffusion: AutoEncoderDiffusion,
@@ -21,7 +21,7 @@ def compute_test_losses(ae_diffusion: AutoEncoderDiffusion,
     x_test_recon = ae.decoder(ae.encoder(x_test))
 
     # Compute test reconstruction error
-    reconstruction_loss_test = ae_loss.reconstruction_loss.forward(x_test_recon, x_test).item()
+    reconstruction_loss_test = torch.sqrt(ae_loss.reconstruction_loss.forward(x_test_recon, x_test)).item()
 
     # Compute Jacobians and Hessians
     decoder_jacobian_test = ae.decoder_jacobian(ae.encoder(x_test))
@@ -42,7 +42,8 @@ def compute_test_losses(ae_diffusion: AutoEncoderDiffusion,
                                                                     decoder_hessian_test,
                                                                     cov_test,
                                                                     mu_test,
-                                                                    normal_proj_test).item()
+                                                                    normal_proj_test,
+                                                                    decoder_jacobian_test).item()
 
     # Diffeomorphism regularization 1
     diffeomorphism_loss_test = ae_loss.diffeomorphism_reg(decoder_jacobian_test, encoder_jacobian_test).item()

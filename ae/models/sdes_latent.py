@@ -23,6 +23,10 @@ class LatentNeuralSDE(nn.Module):
                  drift_act: nn.Module,
                  diffusion_act: nn.Module,
                  encoder_act: Optional[nn.Module] = None,
+                 spectral_normalize=True,
+                 weight_normalize=False,
+                 fro_normalize=False,
+                 fro_max_norm=1.,
                  *args,
                  **kwargs):
         """
@@ -44,16 +48,16 @@ class LatentNeuralSDE(nn.Module):
         activations_sigma = [diffusion_act for _ in range(len(neurons_sigma) - 2)] + [encoder_act]
         self.drift_net = FeedForwardNeuralNet(neurons_mu,
                                               activations_mu,
-                                              spectral_normalize=False,
-                                              weight_normalize=False,
-                                              fro_normalize=False,
-                                              fro_max_norm=10.)
+                                              spectral_normalize=spectral_normalize,
+                                              weight_normalize=weight_normalize,
+                                              fro_normalize=fro_normalize,
+                                              fro_max_norm=fro_max_norm)
         self.diffusion_net = FeedForwardNeuralNet(neurons_sigma,
                                                   activations_sigma,
-                                                  spectral_normalize=False,
-                                                  weight_normalize=False,
-                                                  fro_normalize=False,
-                                                  fro_max_norm=10.)
+                                                  spectral_normalize=spectral_normalize,
+                                                  weight_normalize=weight_normalize,
+                                                  fro_normalize=fro_normalize,
+                                                  fro_max_norm=fro_max_norm)
 
     def diffusion(self, z: Tensor) -> Tensor:
         """
@@ -137,11 +141,15 @@ class AutoEncoderDiffusion(nn.Module):
                                     for path in latent_ensemble])
         return lifted_ensemble
 
-    def compute_sde_manifold_tensors(self, x: Tensor):
+    def compute_sde_manifold_tensors(self, x: Tensor, cov=None):
         z = self.autoencoder.encoder.forward(x)
         dphi = self.autoencoder.decoder_jacobian(z)
         latent_diffusion = self.latent_sde.diffusion(z)
-        latent_covariance = torch.bmm(latent_diffusion, latent_diffusion.mT)
+        if cov is None:
+            latent_covariance = torch.bmm(latent_diffusion, latent_diffusion.mT)
+        else:
+            dpi = self.autoencoder.encoder_jacobian(x)
+            latent_covariance = torch.bmm(dpi, torch.bmm(cov, dpi.mT))
         hessian = self.autoencoder.decoder_hessian(z)
         q = ambient_quadratic_variation_drift(latent_covariance, hessian)
         return z, dphi, latent_diffusion, q
@@ -157,21 +165,21 @@ class AutoEncoderDiffusion(nn.Module):
         local_drift = self.latent_sde.drift_net(z)
         return local_drift
 
-    def compute_ambient_drift(self, x: Tensor) -> Tensor:
-        z, dphi, b, q = self.compute_sde_manifold_tensors(x)
+    def compute_ambient_drift(self, x: Tensor, cov=None) -> Tensor:
+        z, dphi, b, q = self.compute_sde_manifold_tensors(x, cov)
         local_drift = self.latent_sde.drift_net.forward(z)
         tangent_drift = torch.bmm(dphi, local_drift.unsqueeze(2)).squeeze()
         mu_model = tangent_drift + 0.5 * q
         return mu_model
 
-    def compute_ambient_covariance(self, x: Tensor) -> Tensor:
-        z, dphi, b, q = self.compute_sde_manifold_tensors(x)
+    def compute_ambient_covariance(self, x: Tensor, cov=None) -> Tensor:
+        z, dphi, b, q = self.compute_sde_manifold_tensors(x, cov)
         bbt = torch.bmm(b, b.mT)
         cov_model = torch.bmm(dphi, torch.bmm(bbt, dphi.mT))
         return cov_model
 
-    def compute_ambient_diffusion(self, x: Tensor) -> Tensor:
-        z, dphi, b, q = self.compute_sde_manifold_tensors(x)
+    def compute_ambient_diffusion(self, x: Tensor, cov=None) -> Tensor:
+        z, dphi, b, q = self.compute_sde_manifold_tensors(x, cov)
         diffusion = torch.bmm(dphi, b)
         return diffusion
 

@@ -88,7 +88,7 @@ fit3.three_stage_fit(aedf, weights, x, mu, cov, p, h)
 
 
 # === Define save paths ===
-save_dir = "saved_models/"
+save_dir = "saved_single_models/"
 os.makedirs(save_dir, exist_ok=True)
 model_path = os.path.join(save_dir, "aedf_model.pt")
 config_path = os.path.join(save_dir, "config.json")

@@ -1,3 +1,7 @@
+"""
+    This module contains implementations of neural-networks for learning a drift vector field
+    and a covariance matrix field for a SDE in any Euclidean space.
+"""
 import torch
 import torch.nn as nn
 
@@ -13,6 +17,10 @@ class AmbientDriftNetwork(nn.Module):
                  hidden_dims: List[int],
                  drift_act: nn.Module,
                  device = "cpu",
+                 spectral_normalize = True,
+                 weight_normalize=False,
+                 fro_normalize=False,
+                 fro_max_norm=1.,
                  *args,
                  **kwargs):
         super().__init__(*args, **kwargs)
@@ -23,10 +31,10 @@ class AmbientDriftNetwork(nn.Module):
         drift_neurons = [input_dim] + hidden_dims + [output_dim]
         drift_acts = [drift_act] * len(hidden_dims) + [None]
         self.drift = FeedForwardNeuralNet(drift_neurons, drift_acts,
-                                          spectral_normalize=True,
-                                          weight_normalize=False,
-                                          fro_normalize=False,
-                                          fro_max_norm=10.)
+                                          spectral_normalize=spectral_normalize,
+                                          weight_normalize=weight_normalize,
+                                          fro_normalize=fro_normalize,
+                                          fro_max_norm=fro_max_norm)
 
     def forward(self, z):
         return self.drift.forward(z)
@@ -47,6 +55,10 @@ class AmbientDiffusionNetwork(nn.Module):
                  hidden_dims: List[int],
                  diffusion_act: nn.Module,
                  device="cpu",
+                 spectral_normalize=True,
+                 weight_normalize=False,
+                 fro_normalize=False,
+                 fro_max_norm=1.,
                  *args,
                  **kwargs):
         super().__init__(*args, **kwargs)
@@ -57,10 +69,10 @@ class AmbientDiffusionNetwork(nn.Module):
         diffusion_neurons = [input_dim] + hidden_dims + [output_dim*output_dim]
         diffusion_acts = [diffusion_act] * len(hidden_dims) + [None]
         self.diffusion = FeedForwardNeuralNet(diffusion_neurons, diffusion_acts,
-                                              spectral_normalize=True,
-                                              weight_normalize=False,
-                                              fro_normalize=False,
-                                              fro_max_norm=10.)
+                                              spectral_normalize=spectral_normalize,
+                                              weight_normalize=weight_normalize,
+                                              fro_normalize=fro_normalize,
+                                              fro_max_norm=fro_max_norm)
 
     def forward(self, z):
         return self.diffusion.forward(z).view((z.size(0), self.output_dim, self.output_dim))

@@ -111,7 +111,7 @@ class WaveSurface(SurfaceBase):
 
 
 class Paraboloid(SurfaceBase):
-    def __init__(self, a=2., b=2.):
+    def __init__(self, a=3., b=3.):
         super().__init__()
         self.a = a
         self.b = b
@@ -124,7 +124,7 @@ class Paraboloid(SurfaceBase):
         return [(-1., 1.), (-1., 1.)]
 
 class ShallowParaboloid(SurfaceBase):
-    def __init__(self, a=3, b=3):
+    def __init__(self, a=4., b=4.):
         super().__init__()
         self.a = a
         self.b = b
@@ -218,6 +218,18 @@ class RationalSurface(SurfaceBase):
     def bounds(self):
         return [(-2., 2.), (-2., 2.)]
 
+class GaussianBump(SurfaceBase):
+    def __init__(self, a=3.):
+        super().__init__()
+        self.a = a
+
+    def equation(self):
+        xnorm_sq = self.u**2+self.v**2
+        fuv = sp.exp(-xnorm_sq/self.a**2)
+        return sp.Matrix([self.u, self.v, fuv])
+
+    def bounds(self):
+        return [(-2., 2.), (-2., 2.)]
 
 # Example of usage
 if __name__ == "__main__":

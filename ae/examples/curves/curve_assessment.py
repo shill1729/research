@@ -8,34 +8,24 @@ import numpy as np
 import seaborn as sns  # Add this to your imports at the top if not already present
 
 from ae.toydata import RiemannianManifold, PointCloud
-from ae.sdes import SDEtorch, SDE
 from ae.models import AutoEncoder, LatentNeuralSDE, AutoEncoderDiffusion
 from ae.models import AmbientDriftNetwork, AmbientDiffusionNetwork
 from ae.utils import process_data
-# TODO:
-#  CODE for
-#  1. Revisit ablation tests and prove 2nd-order beats 1st-order
-#  2. Write up new script
-#
-#    theoretical part:
-#   improvement of generalization gap for autoencoder-UAT's.
-
+from ae.sdes.sdes import SDEtorch
 
 n_test = 10000
 # Parameters for sample paths
-tn = 1.
-ntime = 500
-npaths = 500
+tn = 0.2
+ntime = 100
+npaths = 100
 plot_sample_paths = False
 
 # Resolution for comparing true curve to model curve
 model_grid = 100
-# Grid for the box [a,b]^2 for L^2 error of coefficients in ambient psace
+# Grid for the box [a,b]^2 for L^2 error of coefficients in ambient space
 num_grid = 40
 # Epsilon for boundary extension
 epsilon = 0.05
-
-
 
 
 # =======================
@@ -136,15 +126,11 @@ ambient_diff_model.load_state_dict(torch.load(os.path.join(save_dir, "ambient_di
 ambient_drift_model.eval()
 ambient_drift_model.eval()
 aedf.eval()
-# =======================
-# 4. Build SDEtorch object
-# =======================
-ambient_sde = SDEtorch(ambient_drift_model.drift_torch, ambient_diff_model.diffusion_torch)
-
 
 print("All models loaded successfully. Ready for evaluation.")
 x, _, mu, cov, local_x = point_cloud.generate(n=n_test, seed=train_seed)
 x, mu, cov, p, n, h = process_data(x, mu, cov, d=intrinsic_dim)
+
 #====
 # Point cloud reconstruction
 #====
@@ -189,6 +175,7 @@ aesde_local_paths = aedf.latent_sde.sample_paths(z0, tn, ntime, npaths)
 aesde_ambient_paths = aedf.lift_sample_paths(aesde_local_paths).detach()
 
 # 3. Generate Euclidean Ambient SDE model paths: just NN for coefficients
+ambient_sde = SDEtorch(ambient_drift_model.drift_torch, ambient_diff_model.diffusion_torch)
 nnsde_ambient_paths = ambient_sde.sample_ensemble(x0, tn, ntime, npaths)
 
 

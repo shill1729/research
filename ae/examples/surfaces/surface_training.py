@@ -3,53 +3,49 @@ import os
 import torch
 
 from ae.toydata import ToyData
-from ae.experiments import Trainer
+from ae.experiment_classes import Trainer
 from ae.toydata.local_dynamics import *
 from ae.toydata.surfaces import *
 
-# TODO: I recently switched back to ambient MSE's for the AE-SDEs. Make sure you are aware of this.
-#  TODO: try more neurons, training more
 device = torch.device("cpu")
 train_seed = None
-test_seed = None
 embedding_seed = 17
 norm = "fro"
-eps_max = 0.5
-# Set large dim = 5,10, 100 for embedding into higher dimension. Note this is imported into 'inference.py'! So make
-# sure it lines up.
-# TODO: currently does not work for the boundary initial point of the sample paths. So it is broken for now.
-large_dim = None
+
+
+# TODO: currently embedding into a large dim does not work for the boundary initial point of the sample paths. So it is broken for now.
+#  Set large dim = 5,10, 100 for embedding into higher dimension. Note this is imported into 'surface_assessment.py'! So make
+#  sure it lines up.
+large_dim = None # none for no embeddding, otherwise some integer for high dimensional embedding randomly
 embed = False # Bool for embedding or not
-print("Current working directory of train.py")
+print("Current working directory of surface_training.py")
 print(os.getcwd())
 
 if __name__ == "__main__":
 
     # torch.manual_seed(train_seed)
     # Point cloud parameters
-    num_points = 30
-    num_test = 20000
+    num_points = 50
     batch_size = int(num_points/2)
-    eps_grid_size = 10
     # The intrinsic and extrinsic dimensions.
     extrinsic_dim, intrinsic_dim = 3, 2
-    hidden_dims = [32]
-    diffusion_layers = [32]
-    drift_layers = [32]
+    hidden_dims = [16, 16, 16]
+    diffusion_layers = [16, 16]
+    drift_layers = [16, 16]
     lr = 0.001
     weight_decay = 0.
-    epochs_ae = 9000
-    epochs_diffusion = 9000
-    epochs_drift = 9000
+    epochs_ae = 15000
+    epochs_diffusion = 15000
+    epochs_drift = 15000
     print_freq = 1000
     # Diffeo weight for accumulative orders
-    diffeo_weight_12 = 0.2 # this is the separate diffeo_weight for just the First order and second order
+    diffeo_weight_12 = 0.1 # this is the separate diffeo_weight for just the First order and second order
     # First order weight: 0.08 was good
     tangent_angle_weight = 0.01
     # Second order weights accumulative
-    tangent_angle_weight2 = 0.02 # the first order weight for the second order model, if accumulating penalties
-    tangent_drift_weight = 0.02
-    surface = RationalSurface()
+    tangent_angle_weight2 = 0.1 # the first order weight for the second order model, if accumulating penalties
+    tangent_drift_weight = 0.1
+    surface = Paraboloid()
     dynamics = RiemannianBrownianMotion()
     if embed:
         extrinsic_dim = large_dim
@@ -57,10 +53,7 @@ if __name__ == "__main__":
     # Main below
     params = {
         "num_points": num_points,
-        "num_test": num_test,
         "batch_size": batch_size,
-        "eps_max": eps_max,
-        "eps_grid_size": eps_grid_size,
         "extrinsic_dim": extrinsic_dim,
         "intrinsic_dim": intrinsic_dim,
         "hidden_dims": hidden_dims,
@@ -89,7 +82,7 @@ if __name__ == "__main__":
 
     # Constant tangent drift weight after warm start
     # anneal_weights = {"tangent_drift_weight": lambda epoch: tangent_drift_weight if epoch >
-    #                                                                                 np.round(epochs_ae / 4) else 0.}
+    #                                                                                 np.round(epochs_ae / 6) else 0.}
 
     anneal_tag = "annealed_2nd" if anneal_weights is not None else "not_annealed"
 

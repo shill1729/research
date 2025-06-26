@@ -67,7 +67,7 @@ def minimize_K(eps, xs, A_array=None, solver="SLSQP"):
 def ellipsoidal_intersection(eps, xs, A_list):
     """
     Returns True if the ellipsoidal balls (with centers xs and matrices A_list)
-    intersect (i.e. if the minimized K(λ) > 0), and False otherwise.
+    intersect (i.e. if the minimized K(λ) >= 0), and False otherwise.
 
     :param eps:
     :param xs:
@@ -75,4 +75,4 @@ def ellipsoidal_intersection(eps, xs, A_list):
     :return:
     """
     result = minimize_K(eps, xs, A_list)
-    return result["K_min"] > 0
+    return result["K_min"] >= 0

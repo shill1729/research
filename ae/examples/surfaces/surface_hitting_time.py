@@ -23,22 +23,22 @@ drift_layers = [32]
 diff_layers = [32]
 lr = 0.001
 weight_decay = 0.
-batch_size = 20
+batch_size = 25
 n_train = 50
 # training epochs
 print_freq = 1000
-epochs_ae = 10000
-epochs_diffusion = 2000
-epochs_drift = 2000
+epochs_ae = 9000
+epochs_diffusion = 9000
+epochs_drift = 9000
 # Paths
-tn = 1
+tn = 0.9
 ntime = 500
-npaths = 2000
+npaths = 500
 # Penalties
-tangent_angle_weight = 0.02
-tangent_drift_weight = 0.02
+tangent_angle_weight = 0.05
+tangent_drift_weight = 0.01
 diffeo_weight = 0.2
-bd = np.array([0.95, -0.95])
+bd = np.array([0.3, -0.3])
 hit_radius = 0.018
 # Time grid
 time_grid = np.linspace(0, tn, ntime+1)
@@ -64,9 +64,9 @@ ae_vanilla = AutoEncoder(extrinsic_dim, intrinsic_dim, hidden_dims, encoder_act,
 latent_sde_vanilla = LatentNeuralSDE(intrinsic_dim, drift_layers, diff_layers, drift_act, diffusion_act)
 aedf_vanilla = AutoEncoderDiffusion(latent_sde_vanilla, ae_vanilla)
 weights_zero = LossWeights(
-    tangent_angle_weight=0.,
+    tangent_angle_weight=tangent_angle_weight,
     tangent_drift_weight=0.,
-    diffeomorphism_reg=0.
+    diffeomorphism_reg=diffeo_weight
 )
 
 fit3 = ThreeStageFit(lr, epochs_ae, epochs_diffusion, epochs_drift, weight_decay, batch_size, print_freq)
@@ -275,8 +275,8 @@ def plot_kde(times, mask, label, color):
                     label=f"{label} (single hit)")
 
 plot_kde(gt_hit,      gt_mask,  "Ground Truth",    "green")
-plot_kde(van_hit,     van_mask, "Vanilla AE-SDE",  "red")
-plot_kde(pen_hit,     pen_mask, "Penalized AE-SDE","blue")
+plot_kde(van_hit,     van_mask, "1st order AE-SDE",  "red")
+plot_kde(pen_hit,     pen_mask, "2nd order AE-SDE","blue")
 
 ax2.set_title("KDE of First Hitting Times")
 ax2.set_xlabel("Hitting Time");  ax2.set_ylabel("Density")
@@ -298,8 +298,8 @@ def plot_survival(hit_times, hit_mask, label, color):
         ax.axhline(1.0, linestyle="--", color=color, label=f"{label} (no hits)")
 
 plot_survival(gt_hit, gt_mask, "Ground Truth", "green")
-plot_survival(van_hit, van_mask, "Vanilla AE-SDE", "red")
-plot_survival(pen_hit, pen_mask, "Penalized AE-SDE", "blue")
+plot_survival(van_hit, van_mask, "1st order AE-SDE", "red")
+plot_survival(pen_hit, pen_mask, "2nd order AE-SDE", "blue")
 
 ax.set_xlabel("Hitting Time")
 ax.set_ylabel("Survival Probability")

@@ -7,7 +7,7 @@ import pandas as pd
 from scipy.stats import gaussian_kde
 from scipy.integrate import trapz
 
-from ae.experiments.training.helpers import save_table
+from ae.experiment_classes.training.helpers import save_table
 
 
 def apply_function(gt, amb, aes: dict, func):

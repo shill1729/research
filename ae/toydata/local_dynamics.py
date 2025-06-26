@@ -106,12 +106,13 @@ class LangevinHarmonicOscillator(DynamicsBase):
 class LangevinDoubleWell(DynamicsBase):
     def drift(self, manifold: RiemannianManifold):
         if manifold.local_coordinates.shape[0] == 2:
-            double_well_potential = sp.Matrix([
-                self.u * (self.u ** 2 - 0.4),
-                self.v / 2
-            ])/8
+            xnorm_sq = self.u**2+self.v**2
+            double_well_potential = 2*sp.Matrix([
+                (4*xnorm_sq - 1)*self.u,
+                (4*xnorm_sq - 1)*self.v
+            ])
         elif manifold.local_coordinates.shape[0] == 1:
-            double_well_potential = sp.Matrix([self.u * (self.u ** 2 - 0.4)]) / 8
+            double_well_potential = sp.Matrix([self.u * (4*self.u ** 2 - 1)])
         else:
             raise NotImplementedError("Only intrinsic dimensions 2 and 1 are implemented")
         manifold_drift = manifold.local_bm_drift()
@@ -198,6 +199,17 @@ class ArbitraryMotion2(DynamicsBase):
         ]) / 5
 
 
+class ArbitraryMotion1D(DynamicsBase):
+    def drift(self, manifold=None):
+        return sp.Matrix([
+            -self.u/ (1 + self.u ** 2)
+        ])
+
+    def diffusion(self, manifold=None):
+        return sp.Matrix([
+            [0.1 * sp.sin(self.u) + 0.02 * self.u ** 2]
+        ]) / 5
+
 class AnisotropicSDE(DynamicsBase):
     def drift(self, manifold: RiemannianManifold):
         u, v = self.u, self.v
@@ -216,8 +228,8 @@ class AnisotropicSDE(DynamicsBase):
         # Define anisotropic diffusion coefficient b (not necessarily isotropic)
         b = sp.Matrix([
             [1, 0],  # Stronger diffusion along u
-            [0, sp.exp(u)]  # Exponential growth in v-direction
-        ])
+            [0, sp.exp(-u)]  # Exponential growth in v-direction
+        ])/10
 
         return manifold.local_bm_diffusion() * b
 

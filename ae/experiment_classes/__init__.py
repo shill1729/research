@@ -1,4 +1,4 @@
-#experiments/__init__.py
+#experiment_classes/__init__.py
 from .training import Trainer
 from .errors import GeometryError, DynamicsError
 from .samplepaths import SamplePathPlotter, SamplePathGenerator

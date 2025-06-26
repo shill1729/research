@@ -133,6 +133,28 @@ class PointCloud:
             p = np.array([self.np_orthogonal_proj(*sample) for sample in param_samples])
         return p
 
+    def ambient_sample_paths(self, latent_paths):
+        npaths, ntime, _ = latent_paths.shape
+        ntime -= 1
+        paths = np.zeros((npaths, ntime + 1, self.target_dim))
+        for j in range(npaths):
+            for i in range(ntime + 1):
+                paths[j, i, :] = np.squeeze(self.np_phi(*latent_paths[j, i, :]))
+        return paths
+
+    def get_curve(self, num_grid=50):
+        """
+
+        :param num_grid:
+
+        :return: tuple of (curve, u) where curve=f(u)
+        """
+        u = np.linspace(self.bounds[0][0], self.bounds[0][1], num_grid)
+        curve = np.zeros((num_grid, 2))
+        for i in range(num_grid):
+            curve[i, :] = self.np_phi(u[i])[:, 0]
+        return curve, u
+
     def plot_point_cloud(self, points=None, drifts=None, plot_drift=False,
                          drift_scale=1.0, alpha=0.5, figsize=(10, 8)):
         """
@@ -299,11 +321,8 @@ class PointCloud:
         points, weights, extrinsic_drifts, extrinsic_covariances, param_samples = self.generate(n=1000)
 
         # Generate latent paths
-        paths1 = self.latent_sde.sample_ensemble(param_samples[0, :], tn=tn, ntime=ntime, npaths=npaths, noise_dim=self.dimension)
-        paths = np.zeros((npaths, ntime + 1, self.target_dim))
-        for j in range(npaths):
-            for i in range(ntime + 1):
-                paths[j, i, :] = np.squeeze(self.np_phi(*paths1[j, i, :]))
+        latent_paths = self.latent_sde.sample_ensemble(param_samples[0, :], tn=tn, ntime=ntime, npaths=npaths, noise_dim=self.dimension)
+        paths = self.ambient_sample_paths(latent_paths)
 
         fig = plt.figure(figsize=figsize)
 
@@ -320,7 +339,7 @@ class PointCloud:
         # Plot 2D local coordinate paths
         ax2 = fig.add_subplot(122)
         for j in range(npaths):
-            ax2.plot(paths1[j, :, 0], paths1[j, :, 1], alpha=0.8)
+            ax2.plot(latent_paths[j, :, 0], latent_paths[j, :, 1], alpha=0.8)
 
         ax2.set_xlabel('u')
         ax2.set_ylabel('v')

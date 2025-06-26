@@ -9,31 +9,31 @@ from ae.toydata import RiemannianManifold, PointCloud
 from ae.utils import process_data
 from ae.models import AutoEncoder, LatentNeuralSDE, AutoEncoderDiffusion, fit_model, ThreeStageFit
 from ae.models import LossWeights, AmbientDriftNetwork, AmbientDiffusionNetwork
-from ae.models.losses import AmbientDriftLoss, AmbientDiffusionLoss
-
+from ae.models.losses.losses_ambient import AmbientDriftLoss, AmbientCovarianceLoss
+from ae.sdes import SDEtorch
 # Model configuration parameters
 train_seed = None  # Set fixed seeds for reproducibility
 test_seed = None
 n_train = 50
-batch_size = 25
+batch_size = int(n_train/2)
 
 # Architecture parameters
 intrinsic_dim = 1
 extrinsic_dim = 2
-hidden_dims = [16]
-drift_layers = [16]
-diff_layers = [16]
+hidden_dims = [8, 8, 8]
+drift_layers = [8, 8, 8]
+diff_layers = [8, 8, 8]
 
 # Training parameters
 lr = 0.001
 weight_decay = 0.
 # Training epochs
-epochs_ae = 15000
-epochs_diffusion = 15000
-epochs_drift = 15000
+epochs_ae = 9000
+epochs_diffusion = 9000
+epochs_drift = 9000
 print_freq = 1000
 # Penalty weights
-diffeo_weight = 0.25
+diffeo_weight = 0.2
 first_order_weight = 0.01
 second_order_weight = 0.01
 
@@ -48,7 +48,7 @@ diffusion_act = nn.Tanh()
 # ============================================================================
 
 # Pick the manifold and dynamics
-curve = Parabola()
+curve = SineCurve()
 dynamics = RiemannianBrownianMotion()
 manifold = RiemannianManifold(curve.local_coords(), curve.equation())
 local_drift = dynamics.drift(manifold)
@@ -71,6 +71,7 @@ ae = AutoEncoder(extrinsic_dim=extrinsic_dim,
 # Declare an instance of the local coordinate SDE networks
 latent_sde = LatentNeuralSDE(intrinsic_dim, drift_layers, diff_layers, drift_act, diffusion_act)
 
+
 # Initialize the AE-SDE object
 aedf = AutoEncoderDiffusion(latent_sde, ae)
 weights = LossWeights(tangent_angle_weight=first_order_weight,
@@ -85,12 +86,13 @@ fit3.three_stage_fit(aedf, weights, x, mu, cov, p, h)
 ambient_drift_model = AmbientDriftNetwork(extrinsic_dim, extrinsic_dim, drift_layers, drift_act)
 ambient_diff_model = AmbientDiffusionNetwork(extrinsic_dim, extrinsic_dim, diff_layers, diffusion_act)
 ambient_drift_loss = AmbientDriftLoss()
-ambient_diff_loss = AmbientDiffusionLoss()
+ambient_diff_loss = AmbientCovarianceLoss()
 
 print("Training ambient diffusion model")
 fit_model(ambient_diff_model, ambient_diff_loss, x, cov, lr, epochs_diffusion, print_freq, weight_decay, batch_size)
 print("\nTraining ambient drift model")  # Fixed typo: was "diffusion" instead of "drift"
 fit_model(ambient_drift_model, ambient_drift_loss, x, mu, lr, epochs_drift, print_freq, weight_decay, batch_size)
+
 
 
 # Gather together all hyperparameters and files into a config:

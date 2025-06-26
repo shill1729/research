@@ -3,16 +3,15 @@ import json
 import inspect
 import torch
 import torch.nn as nn
-from pathlib import Path
 
 from ae.toydata.datagen import ToyData
-from ae.experiments.training.helpers import setup_experiment_dir
-from ae.models.ambient_sdes import AmbientDriftNetwork, AmbientDiffusionNetwork
+from ae.experiment_classes.training.helpers import setup_experiment_dir
+from ae.models.sdes_ambient import AmbientDriftNetwork, AmbientDiffusionNetwork
 from ae.models.autoencoder import AutoEncoder
 from ae.models.fitting import ThreeStageFit, fit_model
-from ae.models.local_neural_sdes import LatentNeuralSDE, AutoEncoderDiffusion
-from ae.models.losses import AmbientDriftLoss, AmbientDiffusionLoss
-from ae.models.losses import LossWeights, LocalCovarianceLoss, LocalDriftLoss
+from ae.models.sdes_latent import LatentNeuralSDE, AutoEncoderDiffusion
+from ae.models.losses.losses_ambient import AmbientDriftLoss, AmbientCovarianceLoss
+from ae.models.losses.losses_autoencoder import LossWeights
 from ae.toydata.surfaces import SurfaceBase
 from ae.toydata.local_dynamics import DynamicsBase
 
@@ -25,6 +24,10 @@ class Trainer:
         self.anneal_tag = anneal_tag
         self.exp_dir = None
         self.embed = embed
+        self.encoder_act = nn.Tanh()
+        self.decoder_act = nn.Tanh()
+        self.drift_act = nn.Tanh()
+        self.diffusion_act = nn.Tanh()
         self._initialize_models()
 
 
@@ -32,37 +35,29 @@ class Trainer:
         base_dir = f"examples/surfaces/trained_models/{self.toy_data.surface.__class__.__name__}/" \
                    f"{self.toy_data.dynamics.__class__.__name__}"
         return setup_experiment_dir(self.params, base_dir, self.anneal_tag)
-    # def _setup_experiment(self):
-    #     # Absolute path to the project root (2 levels up from this file)
-    #     root_dir = Path(__file__).resolve().parents[1]
-    #
-    #     base_dir = root_dir / "examples" / "surfaces" / "trained_models" / \
-    #                self.toy_data.surface.__class__.__name__ / \
-    #                self.toy_data.dynamics.__class__.__name__
-    #
-    #     return setup_experiment_dir(self.params, base_dir, self.anneal_tag)
 
     def _initialize_models(self):
         extrinsic_dim, intrinsic_dim = self.params["extrinsic_dim"], self.params["intrinsic_dim"]
         hidden_dims, diffusion_layers, drift_layers = self.params["hidden_dims"], self.params["diffusion_layers"], \
         self.params["drift_layers"]
-        activation = nn.Tanh()
 
         self.models = {}
         for model_type in ["vanilla", "first", "second"]:
-            ae = AutoEncoder(extrinsic_dim, intrinsic_dim, hidden_dims, activation, activation)
-            latent_sde = LatentNeuralSDE(intrinsic_dim, drift_layers, diffusion_layers, activation, activation,
-                                         activation)
+            ae = AutoEncoder(extrinsic_dim, intrinsic_dim, hidden_dims, self.encoder_act, self.decoder_act)
+            latent_sde = LatentNeuralSDE(intrinsic_dim, drift_layers, diffusion_layers, self.drift_act, self.diffusion_act,
+                                         self.encoder_act)
             self.models[model_type] = AutoEncoderDiffusion(latent_sde, ae)
 
-        self.ambient_drift = AmbientDriftNetwork(extrinsic_dim, extrinsic_dim, drift_layers, activation, device=self.device)
-        self.ambient_diffusion = AmbientDiffusionNetwork(extrinsic_dim, extrinsic_dim, diffusion_layers, activation, device=self.device)
-        weights_vanilla = LossWeights()
+        self.ambient_drift = AmbientDriftNetwork(extrinsic_dim, extrinsic_dim, drift_layers, self.drift_act, device=self.device)
+        self.ambient_diffusion = AmbientDiffusionNetwork(extrinsic_dim, extrinsic_dim, diffusion_layers, self.diffusion_act, device=self.device)
+        weights_vanilla = LossWeights(diffeomorphism_reg=self.params["diffeo_weight"])
         weights_first_order = LossWeights(diffeomorphism_reg=self.params["diffeo_weight"],
                                           tangent_angle_weight=self.params["tangent_angle_weight"])
         weights_second_order = LossWeights(diffeomorphism_reg=self.params["diffeo_weight"],
                                            tangent_angle_weight=self.params["tangent_angle_weight2"],
-                                           tangent_drift_weight=self.params["tangent_drift_weight"])
+                                           tangent_drift_weight=self.params["tangent_drift_weight"],
+                                           encoder_contraction_weight=0.,
+                                           decoder_contraction_weight=0.001)
         print("Second order model")
         print(weights_second_order)
         self.ae_loss_weights = {
@@ -103,7 +98,7 @@ class Trainer:
                   self.params["epochs_drift"],
                   self.params["print_freq"], self.params["weight_decay"], self.params["batch_size"])
         print("Training Ambient diffusion/covariance:")
-        fit_model(self.ambient_diffusion.to(self.device), AmbientDiffusionLoss().to(self.device), x, data["cov"], self.params["lr"],
+        fit_model(self.ambient_diffusion.to(self.device), AmbientCovarianceLoss().to(self.device), x, data["cov"], self.params["lr"],
                   self.params["epochs_drift"],
                   self.params["print_freq"], self.params["weight_decay"], self.params["batch_size"])
 
@@ -219,8 +214,8 @@ class Trainer:
 
 
 if __name__ == "__main__":
-    from ae.experiments.errors.manifold_errors import GeometryError
-    from ae.experiments.errors.sde_errors import DynamicsError
+    from ae.experiment_classes.errors.manifold_errors import GeometryError
+    from ae.experiment_classes.errors.sde_errors import DynamicsError
     eps_grid_size= 10
     num_test = 20000
     tn = 0.5

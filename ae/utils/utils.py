@@ -16,6 +16,11 @@ from torch import nn
 
 class FrobeniusClipParametrization(nn.Module):
     def __init__(self, max_norm: float):
+        """
+        Clip the Frobenius norm of all the weights of a module.
+
+        :param max_norm: maximum value of the Frobenius norm
+        """
         super().__init__()
         self.max_norm = max_norm
 

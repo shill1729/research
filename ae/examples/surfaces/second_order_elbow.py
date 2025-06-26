@@ -5,8 +5,8 @@ from ae.toydata.surfaces import *
 from ae.toydata.local_dynamics import *
 from ae.models.fitting import fit_model
 from ae.models.autoencoder import AutoEncoder
-from ae.models.local_neural_sdes import AutoEncoderDiffusion, LatentNeuralSDE
-from ae.models.losses import TotalLoss, LossWeights
+from ae.models.sdes_latent import AutoEncoderDiffusion, LatentNeuralSDE
+from ae.models.losses.losses_autoencoder import TotalLoss, LossWeights
 from ae.utils.performance_analysis import compute_test_losses
 import torch.nn as nn
 import matplotlib.pyplot as plt

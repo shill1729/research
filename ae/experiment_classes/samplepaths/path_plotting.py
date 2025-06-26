@@ -1,8 +1,8 @@
 from ae.toydata.datagen import ToyData
-from ae.experiments.training.training import Trainer
-from ae.experiments.samplepaths.pathgen import SamplePathGenerator
-from ae.experiments.samplepaths.path_computations import *
-from ae.experiments.training.helpers import save_plot, get_time_horizon_name
+from ae.experiment_classes.training.training import Trainer
+from ae.experiment_classes.samplepaths.pathgen import SamplePathGenerator
+from ae.experiment_classes.samplepaths.path_computations import *
+from ae.experiment_classes.training.helpers import save_plot, get_time_horizon_name
 
 import os
 import numpy as np
@@ -92,7 +92,7 @@ class SamplePathPlotter:
                             linestyle="dashed", ax=ax)
 
             for model_name, model in model_ensembles.items():
-                sns.kdeplot(model[:, terminal_idx, i], label=model_name, color=colors[model_name],linewidth=2, linestyle="dashed", ax=ax)
+                sns.kdeplot(model[:, terminal_idx, i].detach(), label=model_name, color=colors[model_name],linewidth=2, linestyle="dashed", ax=ax)
 
             ax.set_xlabel(f"Coordinate {i + 1}")
             ax.set_title(f"{time_type} Density for coordinate {i + 1}")
@@ -126,8 +126,8 @@ class SamplePathPlotter:
             ax1 = fig.add_subplot(1, 2, 1)
             gt = model_data["Ground Truth"]
             for model_name, values in model_data.items():
-                if model_name != "Ambient Model":
-                    ax1.plot(time_grid, values.cpu().detach(), label=model_name, color=colors[model_name])
+                # if model_name != "Ambient Model":
+                ax1.plot(time_grid, values.cpu().detach(), label=model_name, color=colors[model_name])
             ax1.set_xlabel("Time")
             ax1.set_ylabel(f"E[{fname}(X_t) | X_0]")
             ax1.set_title(f"{fname}")
@@ -137,7 +137,7 @@ class SamplePathPlotter:
             # Plot squared errors
             ax2 = fig.add_subplot(1, 2, 2)
             for model_name, values in model_data.items():
-                if model_name != "Ground Truth" and model_name != "Ambient Model":  # Skip ground truth in error plot
+                if model_name != "Ground Truth":  # Skip ground truth in error plot
                     ax2.plot(time_grid, (np.array(values.cpu().detach()) - np.array(gt.cpu().detach())) ** 2, label=model_name, color=colors[model_name])
             ax2.set_xlabel("Time")
             ax2.set_ylabel("MSE")
@@ -378,14 +378,14 @@ class SamplePathPlotter:
         self.plot_time_series_with_errors(results)
         # self.plot_time_series_with_confidence(results)
         # TODO we need to lift the ground truth sample paths when we embed.
-        self.plot_deviation_of_means(results, False, plot_name="state")
+        # self.plot_deviation_of_means(results, False, plot_name="state")
         # self.plot_deviation_of_means(results, True, plot_name="state")
-        self.plot_mean_deviation(results, plot_name="state")
-        self.plot_variance_deviation_errors(results, plot_name="state")
-        self.plot_covariance_errors(results, False, "fro", plot_name="state")
+        # self.plot_mean_deviation(results, plot_name="state")
+        # self.plot_variance_deviation_errors(results, plot_name="state")
+        # self.plot_covariance_errors(results, False, "fro", plot_name="state")
         # self.plot_covariance_errors(results, True, "fro", plot_name="state")
-        self.plot_covariance_errors(results, False, "nuc", "state")
+        # self.plot_covariance_errors(results, False, "nuc", "state")
         # self.plot_covariance_errors(results, True, "nuc", "state")
-        self.plot_covariance_errors(results, False, -2, "state")
+        # self.plot_covariance_errors(results, False, -2, "state")
         # self.plot_covariance_errors(results, True, -2, save_dir)
         return results

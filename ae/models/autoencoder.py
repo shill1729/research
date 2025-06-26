@@ -1,9 +1,6 @@
 """
-    NEW!
-
     An implementation of an auto-encoder using PyTorch. It is implemented as a class with various methods
-    for computing objects from differential geometry (e.g. orthogonal projections) as well as having
-    loss functions and penalties as methods.
+    for computing objects from differential geometry (e.g. orthogonal projections).
 """
 from typing import List
 from torch import Tensor

@@ -4,12 +4,13 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 from ae.toydata.datagen import ToyData
-from ae.models.local_neural_sdes import AutoEncoderDiffusion
-from ae.models.losses import TotalLoss, AmbientDriftLoss, AmbientDiffusionLoss, LossWeights
-from ae.models.ambient_sdes import AmbientDriftNetwork, AmbientDiffusionNetwork
+from ae.models.sdes_latent import AutoEncoderDiffusion
+from ae.models.losses.losses_autoencoder import TotalLoss, LossWeights
+from ae.models.losses.losses_ambient import AmbientDriftLoss, AmbientCovarianceLoss
+from ae.models.sdes_ambient import AmbientDriftNetwork, AmbientDiffusionNetwork
 from ae.utils.performance_analysis import compute_test_losses
-from ae.experiments.training.helpers import save_plot
-from ae.experiments.training.training import Trainer
+from ae.experiment_classes.training.helpers import save_plot
+from ae.experiment_classes.training.training import Trainer
 from ae.utils.plot_functions import plot_interior_boundary_highlight, plot_interior_boundary_recon, plot_interior_boundary_latent
 
 class GeometryError:
@@ -18,7 +19,7 @@ class GeometryError:
         self.toydata = toydata
         self.ae_dict = trainer.models
         self.ambient_drift_loss = AmbientDriftLoss()
-        self.ambient_diffusion_loss = AmbientDiffusionLoss()
+        self.ambient_diffusion_loss = AmbientCovarianceLoss()
         self.eps_max = eps_max
         self.device = device
         self.ae_loss = TotalLoss(LossWeights())
@@ -32,10 +33,10 @@ class GeometryError:
         self.toydata.set_point_cloud(epsilon, True)
         return self.toydata.generate_data(n, 2, test_seed, self.device, embed=self.embed)
 
-    def compute_ambient_diff_and_drift(self,
-                                       drift_model: AmbientDriftNetwork,
-                                       diffusion_model: AmbientDiffusionNetwork,
-                                       x_subset, cov_subset, mu_subset):
+    def compute_ambient_diff_and_drift_loss(self,
+                                            drift_model: AmbientDriftNetwork,
+                                            diffusion_model: AmbientDiffusionNetwork,
+                                            x_subset, cov_subset, mu_subset):
         # Comment this and use it if you want to use local.
         # z_subset = self.trainer.models["vanilla"].autoencoder.encoder(x_subset)
         # 3/11/2025: it doesnt make sense to train mu(z) and sigma(z) ambiently.
@@ -43,16 +44,16 @@ class GeometryError:
         # mapped up to ambient dimension.
         # The vanilla ambient model must have mu(x) and sigma(x) in R^D (R^{D x D}) for sample paths
         # unless you do some encoding and decoding which I guess we could test too.
-        mu_loss = self.ambient_drift_loss.forward(drift_model, x_subset, mu_subset).item()
-        sigma_loss = self.ambient_diffusion_loss.forward(diffusion_model, x_subset, cov_subset).item()
-        return mu_loss, sigma_loss
+        mu_loss = self.ambient_drift_loss.forward(drift_model, x_subset, mu_subset)
+        sigma_loss = self.ambient_diffusion_loss.forward(diffusion_model, x_subset, cov_subset)
+        return torch.sqrt(mu_loss).item(), torch.sqrt(sigma_loss).item()
 
-    def compute_our_ambient_diff_and_drift(self, aedf: AutoEncoderDiffusion, x_subset, cov_subset, mu_subset):
+    def compute_our_ambient_diff_and_drift_loss(self, aedf: AutoEncoderDiffusion, x_subset, cov_subset, mu_subset):
         # Compute model diffusion loss
-        mu_model = aedf.compute_ambient_drift(x_subset)
+        mu_model = aedf.compute_ambient_drift(x_subset, cov_subset)
         cov_model = aedf.compute_ambient_covariance(x_subset)
-        mu_loss = torch.mean(torch.linalg.vector_norm(mu_model - mu_subset, ord=2, dim=1) ** 2)
-        cov_loss = torch.mean(torch.linalg.matrix_norm(cov_model - cov_subset, ord="fro") ** 2)
+        mu_loss = torch.sqrt(torch.mean(torch.linalg.vector_norm(mu_model - mu_subset, ord=2, dim=1) ** 2))
+        cov_loss = torch.sqrt(torch.mean(torch.linalg.matrix_norm(cov_model - cov_subset, ord="fro") ** 2))
         return mu_loss.item(), cov_loss.item()
 
     # -------------------------------------
@@ -79,10 +80,10 @@ class GeometryError:
                                                 self.ae_loss,
                                                 x_bnd, p_bnd, frame_bnd, cov_bnd, mu_bnd,
                                                 device=self.device)
-            drift_loss, diffusion_loss = self.compute_our_ambient_diff_and_drift(model, x_bnd, cov_bnd, mu_bnd)
-            ambient_drift_loss, ambient_diff_loss = self.compute_ambient_diff_and_drift(self.ambient_drift,
-                                                                                        self.ambient_diffusion,
-                                                                                        x_bnd, cov_bnd, mu_bnd)
+            drift_loss, diffusion_loss = self.compute_our_ambient_diff_and_drift_loss(model, x_bnd, cov_bnd, mu_bnd)
+            ambient_drift_loss, ambient_diff_loss = self.compute_ambient_diff_and_drift_loss(self.ambient_drift,
+                                                                                             self.ambient_diffusion,
+                                                                                             x_bnd, cov_bnd, mu_bnd)
             return losses_subset, drift_loss, diffusion_loss, ambient_drift_loss, ambient_diff_loss
 
     def compute_and_plot_errors(self, eps_grid_size, num_test, test_seed, local_space=False):

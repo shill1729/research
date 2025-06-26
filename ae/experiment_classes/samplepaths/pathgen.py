@@ -5,8 +5,8 @@ import torch
 import numpy as np
 
 from ae.toydata.datagen import ToyData
-from ae.experiments.training.training import Trainer
-from ae.models.local_neural_sdes import AutoEncoderDiffusion
+from ae.experiment_classes.training.training import Trainer
+from ae.models.sdes_latent import AutoEncoderDiffusion
 from ae.sdes import SDE, SDEtorch
 from ae.utils import random_rotation_matrix, pad
 
@@ -125,11 +125,13 @@ class SamplePathGenerator:
         # TODO: does not work for embedded data
         if self.toydata.large_dim is not None:
             raise NotImplemented("Sampling from the boundary for embedded data is not implemented yet.")
-        a = self.toydata.surface.bounds()[0][0] - 0.01
-        b = self.toydata.surface.bounds()[0][1] + 0.01
+        # Sample from just within the boundary.
+        # a = self.toydata.surface.bounds()[0][0] + 0.05
+        # b = self.toydata.surface.bounds()[0][1] - 0.05
         a = 0.01
         b = 0.01
         bd_x0 = self.toydata.point_cloud.np_phi(a, b).reshape((1, 3)).squeeze(0)
+
         return bd_x0
 
     def generate_paths(self, tn, ntime, npaths, seed=None, embed=False, large_dim=3):
@@ -148,9 +150,8 @@ class SamplePathGenerator:
         """
         # TODO: right now the initial point 'x0' is generated internally. Do we want the option to pass it?
         # x0 = self.toydata.point_cloud.generate(1, seed=seed)[0]  # numpy (D,)
-        # x0 = self.get_best_point(embed=embed).detach().numpy()
-        x0 = self.get_bd_point()
-        print("Point with smallest reconstruction error")
+        x0 = self.get_best_point(embed=embed).detach().numpy()
+        # x0 = self.get_bd_point()
         print(x0)
         # x0 = self.toydata.point_cloud.np_phi(*[0.8, 0.8]).squeeze(1)
         # print("Point near the boundary")

@@ -89,7 +89,7 @@ class HalfEllipse(CurveBase):
 
 
 class SineCurve(CurveBase):
-    def __init__(self, amplitude=1.0, frequency=1.0, phase=0.0):
+    def __init__(self, amplitude=1.0, frequency=2.5, phase=0.0):
         super().__init__()
         self.amplitude = amplitude
         self.frequency = frequency
@@ -182,6 +182,20 @@ class BellCurve(CurveBase):
 
     def bounds(self):
         return [(-1., 1.)]
+
+class Circle(CurveBase):
+    def __init__(self, a=1, b=1.):
+        super().__init__()
+        self.a = a
+        self.b = b
+
+    def equation(self):
+        x = sp.cos(self.u)
+        y = sp.sin(self.u)
+        return sp.Matrix([x, y])
+
+    def bounds(self):
+        return [(0, 2*np.pi)]
 
 # Example of usage
 if __name__ == "__main__":
