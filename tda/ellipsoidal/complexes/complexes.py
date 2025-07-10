@@ -1,6 +1,6 @@
 import numpy as np
 from itertools import combinations
-from tda.solvers.scipy_solver import ellipsoidal_intersection
+from tda.ellipsoidal.solvers.scipy_solver import ellipsoidal_intersection
 
 
 class EllipsoidalComplex:
@@ -36,7 +36,7 @@ class EllipsoidalComplex:
             return True
         xs = self.points[list(simplex_indices)]
         A_subset = self.A_matrices[list(simplex_indices)]
-        # TODO: error handling?
+        # TODO: swap in other methods once we have other solvers to time.
         return ellipsoidal_intersection(self.eps, xs, A_subset)
 
     def build_complex(self, max_dim=3):
@@ -83,7 +83,7 @@ class EllipsoidalVR(EllipsoidalComplex):
                 return False
         return True
 
-
+# TODO: Isn't this class redundant? It duplicates _check_simplex exactly from the base-class, no?
 class EllipsoidalCech(EllipsoidalComplex):
     """
     Ellipsoidal Čech complex:

@@ -155,6 +155,18 @@ class PointCloud:
             curve[i, :] = self.np_phi(u[i])[:, 0]
         return curve, u
 
+    def get_surface(self, num_grid=50):
+        u1 = np.linspace(self.bounds[0][0], self.bounds[0][1], num_grid)
+        u2 = np.linspace(self.bounds[1][0], self.bounds[1][1], num_grid)
+        U1, U2 = np.meshgrid(u1, u2, indexing='ij')  # shape (num_grid, num_grid)
+        curve = np.zeros((num_grid, num_grid, self.target_dim))
+        for i in range(num_grid):
+            for j in range(num_grid):
+                u = U1[i, j]
+                v = U2[i, j]
+                curve[i, j, :] = self.np_phi(u, v)[:, 0]
+        return curve, (U1, U2)
+
     def plot_point_cloud(self, points=None, drifts=None, plot_drift=False,
                          drift_scale=1.0, alpha=0.5, figsize=(10, 8)):
         """

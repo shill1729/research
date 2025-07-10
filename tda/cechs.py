@@ -1,34 +1,8 @@
-import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.patches import Ellipse
-from matplotlib.collections import LineCollection, PolyCollection
-from tda.complexes.ellipsoidal_complexes import EllipsoidalVR, EllipsoidalCech
-from tda.toydata.curves import generate_curve_point_cloud_and_ellipses
+from matplotlib import pyplot as plt
 
-
-def plot_point_cloud(ax, xs, A_list, curve, eps=1.):
-    ax.scatter(xs[:, 0], xs[:, 1], color='black', zorder=3)
-    ax.plot(curve[:, 0], curve[:, 1], color='red', lw=1.5, linestyle='--', zorder=2)
-    for x, A in zip(xs, A_list):
-        eigvals, eigvecs = np.linalg.eigh(A)
-        width, height = 2 * np.sqrt(eigvals) * eps
-        angle = np.degrees(np.arctan2(eigvecs[1, 0], eigvecs[0, 0]))
-        ellipse = Ellipse(xy=x, width=width, height=height, angle=angle,
-                          edgecolor='blue', facecolor='none', lw=1.0, zorder=1)
-        ax.add_patch(ellipse)
-
-
-def plot_simplices(ax, xs, edges, triangles=None):
-    # Edges as a LineCollection
-    edge_segments = [(xs[i], xs[j]) for i, j in edges]
-    lc = LineCollection(edge_segments, colors='black', linewidths=1.5, zorder=0)
-    ax.add_collection(lc)
-
-    # Optional triangle faces as a PolyCollection
-    if triangles:
-        polys = [[xs[idx] for idx in tri] for tri in triangles]
-        pc = PolyCollection(polys, facecolors='cyan', edgecolors='none', alpha=0.9, zorder=0)
-        ax.add_collection(pc)
+from tda.ellipsoidal.complexes.complexes import EllipsoidalVR, EllipsoidalCech
+from tda.ellipsoidal.plotting.plotting import plot_point_cloud, plot_simplices
+from tda.toydata.toydata import generate_curve_point_cloud_and_ellipses
 
 
 def build_and_plot_all(xs, A_list, curve, epsilons):
@@ -60,8 +34,10 @@ def build_and_plot_all(xs, A_list, curve, epsilons):
     plt.tight_layout()
     plt.show()
 
+
 if __name__ == '__main__':
     xs, A_list, point_cloud = generate_curve_point_cloud_and_ellipses(n=3)
     curve, _ = point_cloud.get_curve(50)
-    epsilons = [0.8, 1.25]
+    # epsilons = [0.8, 1.25]
+    epsilons = [0.1, 0.5]
     build_and_plot_all(xs, A_list, curve, epsilons)

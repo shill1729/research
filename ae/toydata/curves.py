@@ -89,7 +89,7 @@ class HalfEllipse(CurveBase):
 
 
 class SineCurve(CurveBase):
-    def __init__(self, amplitude=1.0, frequency=2.5, phase=0.0):
+    def __init__(self, amplitude=1.0, frequency=1, phase=0.0):
         super().__init__()
         self.amplitude = amplitude
         self.frequency = frequency
@@ -100,6 +100,11 @@ class SineCurve(CurveBase):
 
     def bounds(self):
         return [(-np.pi, np.pi)]
+
+
+class FastSineCurve(SineCurve):
+    def __init__(self, amplitude=0.25, frequency=2.5, phase=0.):
+        super().__init__(amplitude, frequency, phase)
 
 
 class EllipticCurve(CurveBase):

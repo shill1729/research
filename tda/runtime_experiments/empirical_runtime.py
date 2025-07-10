@@ -9,7 +9,7 @@ from ae.toydata.pointclouds import PointCloud
 from ae.toydata.local_dynamics import BrownianMotion
 from ae.toydata.surfaces import Sphere
 from ae.utils import compute_orthogonal_projection_from_cov
-from tda.solvers.scipy_solver import minimize_K
+from tda.ellipsoidal.solvers.scipy_solver import minimize_K
 
 
 # -------------------------------

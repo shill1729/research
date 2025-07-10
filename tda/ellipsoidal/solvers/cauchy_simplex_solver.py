@@ -1,6 +1,6 @@
 import numpy as np
 
-from tda.solvers.kfunction import compute_K_gradient_fast, compute_K_fast, compute_K_hessian_fast, get_A_operations_fast
+from tda.ellipsoidal.solvers.kfunction import compute_K_gradient_fast, compute_K_fast, get_A_operations_fast
 
 
 def cauchy_simplex_solver(eps, xs, A_list, max_iters=200, tol=1e-6):

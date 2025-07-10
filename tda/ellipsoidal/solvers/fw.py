@@ -1,5 +1,5 @@
 import numpy as np
-from tda.solvers.kfunction import (
+from tda.ellipsoidal.solvers.kfunction import (
     compute_K_fast,
     compute_K_gradient_fast,
     get_A_operations_fast

@@ -5,36 +5,45 @@ It generates points uniformly on a curve, with respect to its arc length measure
 """
 import numpy as np
 
+from typing import Union
 from ae.symbolic.diffgeo import RiemannianManifold
 from ae.toydata.local_dynamics import RiemannianBrownianMotion
 from ae.toydata.pointclouds import PointCloud
-from ae.toydata.curves import Circle
+from ae.toydata.curves import CurveBase
+from ae.toydata.surfaces import SurfaceBase
 from ae.utils import compute_orthogonal_projection_from_cov
 
 
-def generate_curve_point_cloud_and_ellipses(n, seed=17):
+def generate_toy_data(n, surface_or_curve: Union[SurfaceBase, CurveBase], seed=17):
     """
     Generate a Riemannian point cloud of n points and compute the corresponding covariance A matrices.
 
     :param n:
+    :param surface_or_curve:
     :param seed:
     :return:
     """
     bm = RiemannianBrownianMotion()
-    sphere = Circle()
-    manifold = RiemannianManifold(sphere.local_coords(), sphere.equation())
-    point_cloud = PointCloud(manifold, sphere.bounds(), bm.drift(manifold), bm.diffusion(manifold), True)
+    manifold = RiemannianManifold(surface_or_curve.local_coords(), surface_or_curve.equation())
+    point_cloud = PointCloud(manifold, surface_or_curve.bounds(), bm.drift(manifold), bm.diffusion(manifold), True)
+    d = point_cloud.dimension
+    print(d)
     x, _, _, cov, _ = point_cloud.generate(n=n, seed=seed)
-
     # Compute orthogonal projection from covariance and then A matrices.
-    p = compute_orthogonal_projection_from_cov(cov, d=1)
-    a = np.zeros((n, 2, 2))
+    p = compute_orthogonal_projection_from_cov(cov, d=d)
+    a = np.zeros((n, d + 1, d + 1))
+    tangent_length1 = 0.4
+    tangent_length2 = 0.3
 
     for i in range(n):
-        tangent_length = 0.4
-        normal_length = 5. * np.abs(x[i, 0]*5+0.1)
+        normal_length = 5. * np.abs(x[i, 0] * 5 + 0.1)
         eigenvalues, eigenvectors = np.linalg.eigh(p[i])
-        desired_eigenvalues = np.diag([normal_length**2, tangent_length**2])
+        if d == 1:
+            desired_eigenvalues = np.diag([normal_length ** 2, tangent_length1 ** 2])
+        elif d == 2:
+            desired_eigenvalues = np.diag([normal_length ** 2, tangent_length1 ** 2, tangent_length2 ** 2])
+        else:
+            raise NotImplementedError("Only up to intrinsic dimension 2 is implemented")
         a[i] = np.linalg.inv(eigenvectors @ desired_eigenvalues @ eigenvectors.T)
     A_list = [a[i] for i in range(n)]
     return x, A_list, point_cloud
@@ -43,9 +52,9 @@ def generate_curve_point_cloud_and_ellipses(n, seed=17):
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
     from matplotlib.patches import Ellipse
-
+    from ae.toydata.curves import Circle
     num_grid = 50
-    xs, A_list, point_cloud = generate_curve_point_cloud_and_ellipses(5)
+    xs, A_list, point_cloud = generate_toy_data(5, Circle())
 
    # Plotting manifold
     curve, _ = point_cloud.get_curve(num_grid)

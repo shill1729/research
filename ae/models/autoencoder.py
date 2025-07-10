@@ -2,7 +2,7 @@
     An implementation of an auto-encoder using PyTorch. It is implemented as a class with various methods
     for computing objects from differential geometry (e.g. orthogonal projections).
 """
-from typing import List
+from typing import List, Optional
 from torch import Tensor
 
 import torch.nn as nn
@@ -11,6 +11,14 @@ import torch
 
 from ae.models.ffnn import FeedForwardNeuralNet
 
+def decoded_covariance(local_cov: Tensor, decoder_jacobian: Tensor) -> Tensor:
+    """
+
+    :param local_cov:
+    :param decoder_jacobian:
+    :return:
+    """
+    return torch.bmm(torch.bmm(decoder_jacobian, local_cov), decoder_jacobian.mT)
 
 class AutoEncoder(nn.Module):
     def __init__(self,
@@ -19,6 +27,11 @@ class AutoEncoder(nn.Module):
                  hidden_dims: List[int],
                  encoder_act: nn.Module,
                  decoder_act: nn.Module,
+                 final_act: Optional[nn.Module] = None,
+                 spectral_normalize: bool = False,
+                 weight_normalize: bool = False,
+                 fro_normalize: bool = False,
+                 fro_max_norm: float = 5.,
                  *args,
                  **kwargs):
         """
@@ -31,6 +44,7 @@ class AutoEncoder(nn.Module):
         :param hidden_dims: list of hidden dimensions for the encoder and decoder
         :param encode_act: the encoder activation function
         :param decode_act: the decoder activation function
+        :param final_act: the final activation layer for the encoder
         :param args: args to pass to nn.Module
         :param kwargs: kwargs to pass to nn.Module
         """
@@ -41,11 +55,15 @@ class AutoEncoder(nn.Module):
         encoder_neurons = [extrinsic_dim] + hidden_dims + [intrinsic_dim]
         # The decoder's layer structure is the reverse of the encoder
         decoder_neurons = encoder_neurons[::-1]
-        encoder_acts = [encoder_act] * (len(hidden_dims) + 1)
+        if final_act is None:
+            encoder_acts = [encoder_act] * (len(hidden_dims) + 1)
+        else:
+            encoder_acts = [encoder_act] * len(hidden_dims) + [final_act]
         # The decoder has no final activation, so it can target anything in the ambient space
         decoder_acts = [decoder_act] * len(hidden_dims) + [None]
-        self.encoder = FeedForwardNeuralNet(encoder_neurons, encoder_acts)
-        self.decoder = FeedForwardNeuralNet(decoder_neurons, decoder_acts)
+        # TODO pass the normalization options
+        self.encoder = FeedForwardNeuralNet(encoder_neurons, encoder_acts, spectral_normalize=False)
+        self.decoder = FeedForwardNeuralNet(decoder_neurons, decoder_acts, spectral_normalize=False)
         # Tie the weights of the decoder to be the transpose of the encoder, in reverse due
         self.decoder.tie_weights(self.encoder)
 
@@ -108,7 +126,7 @@ class AutoEncoder(nn.Module):
         dphi = self.decoder_jacobian(z)
         g = torch.bmm(dphi.mT, dphi)
         g_inv = torch.linalg.inv(g)
-        P = torch.bmm(torch.bmm(dphi, g_inv), dphi.mT)
+        P = decoded_covariance(g_inv, dphi)
         return P
 
     def neural_metric_tensor(self, z: Tensor) -> Tensor:
@@ -142,6 +160,90 @@ class AutoEncoder(nn.Module):
         """
         g = self.metric_tensor(z)
         return torch.sqrt(torch.linalg.det(g))
+
+    def brownian_drift_1(self, z: Tensor) -> Tensor:
+        """
+        Compute the drift vector field of Brownian motion on the manifold:
+            0.5 * ∇_g · g^{-1}
+        where the divergence is taken row-wise with respect to the Riemannian metric
+        induced by the decoder at z.
+
+        :param z: Latent tensor of shape (batch_size, intrinsic_dim)
+        :return: Drift vector field of shape (batch_size, intrinsic_dim)
+        """
+        z = z.requires_grad_(True)
+        batch_size, d = z.shape
+
+        # Compute metric and its inverse
+        g = self.neural_metric_tensor(z)  # (B, d, d)
+        g_inv = torch.linalg.inv(g)       # (B, d, d)
+
+        # Compute log(sqrt(det g)) = 0.5 * log det g
+        log_sqrt_det_g = 0.5 * torch.logdet(g)  # (B,)
+        grad_log_vol = torch.autograd.grad(
+            outputs=log_sqrt_det_g.sum(), inputs=z, create_graph=True
+        )[0]  # (B, d)
+
+        # Compute divergence of each row of g^{-1}
+        divergence_rows = []
+        for i in range(d):
+            row = g_inv[:, i, :]  # (B, d)
+            grads = []
+            for j in range(d):
+                grad_row_j = torch.autograd.grad(
+                    outputs=row[:, j].sum(), inputs=z, create_graph=True
+                )[0][:, j]  # (B,)
+                grads.append(grad_row_j)
+            div_row_i = torch.stack(grads, dim=1).sum(dim=1)  # (B,)
+            divergence_rows.append(div_row_i)
+
+        divergence = torch.stack(divergence_rows, dim=1)  # (B, d)
+
+        # Add the term from the volume form correction
+        result = 0.5 * (divergence + grad_log_vol)  # (B, d)
+        return result
+
+    def brownian_drift_2(self, z: Tensor) -> Tensor:
+        """
+        Compute the intrinsic Brownian‐motion drift on the manifold via
+        b^k = 0.5 * g^{ij} Gamma^k_{ij},
+        with Gamma^k_{ij} = 0.5 * g^{kℓ}(∂_i g_{jℓ} + ∂_j g_{iℓ} - ∂_ℓ g_{ij}).
+
+        More efficient than row‐wise divergence + volume correction.
+        """
+        z = z.requires_grad_(True)
+        B, d = z.shape
+
+        # 1) metric and inverse
+        g = self.neural_metric_tensor(z)        # (B, d, d)
+        g_inv = torch.linalg.inv(g)             # (B, d, d)
+
+        drift = torch.zeros(B, d, device=z.device, dtype=z.dtype)
+        for b in range(B):
+            # 2) compute ∂_m g_{ij}(z[b]) via one Jacobian call
+            def metric_fn(y: Tensor) -> Tensor:
+                # returns (d,d) for single sample
+                return self.neural_metric_tensor(y.unsqueeze(0))[0]
+            # metric_grad[m, i, j] = ∂_m g_{ij}
+            metric_grad = torch.autograd.functional.jacobian(
+                metric_fn, z[b], create_graph=True
+            )  # (d, d, d)
+
+            # 4) contract to get b^k = 0.5 * g_inv^{ij} Γ^k_{ij}
+            # note: Γ^k_{ij} = 0.5 * g_inv[b, k, ℓ] * (metric_grad[i,j,ℓ] + metric_grad[j,i,ℓ] - metric_grad[ℓ,i,j])
+            gamma = 0.5 * torch.einsum(
+                'kℓ,ijℓ->ijk',
+                g_inv[b],
+                (metric_grad.permute(2, 1, 0)  # ∂_i g_{jℓ}
+                 + metric_grad.permute(1, 2, 0)  # ∂_j g_{iℓ}
+                 - metric_grad)                  # - ∂_ℓ g_{ij}
+            )  # (i,j,k)
+
+            drift[b] = 0.5 * torch.einsum('ij,ijk->k', g_inv[b], gamma)
+
+        return drift
+
+
 
     def lift_sample_paths(self, latent_ensemble: np.ndarray) -> np.ndarray:
         """

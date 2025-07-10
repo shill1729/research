@@ -137,11 +137,11 @@ class ThreeStageFit:
         self.batch_size = batch_size
         self.print_freq = print_freq
 
-    def three_stage_fit(self, ae_diffusion: AutoEncoderDiffusion, weights: LossWeights, x, mu, cov, p, orthonormal_frame, anneal_weights=None, norm="fro", device="cpu", ambient=False):
+    def three_stage_fit(self, ae_diffusion: AutoEncoderDiffusion, weights: LossWeights, x, mu, cov, p, orthonormal_frame, anneal_weights=None, norm="fro", device="cpu", ambient_cov_mse=False, ambient_drift_mse=False):
         ae_loss = TotalLoss(weights, norm, device)
         ae_diffusion.to(device)
-        diffusion_loss = LocalCovarianceLoss(norm, ambient=ambient).to(device)
-        drift_loss = LocalDriftLoss(ambient=ambient).to(device)
+        diffusion_loss = LocalCovarianceLoss(norm, ambient=ambient_cov_mse).to(device)
+        drift_loss = LocalDriftLoss(ambient=ambient_drift_mse).to(device)
 
         # Train the AE.
         set_grad_tracking(ae_diffusion.autoencoder, True)
@@ -174,7 +174,7 @@ class ThreeStageFit:
         encoded_cov = torch.bmm(torch.bmm(dpi, cov), dpi.mT)
 
         # Encoded covariance using jacobian of encoder
-        if ambient:
+        if ambient_cov_mse:
             loss_space = "ambient"
         else:
             loss_space = "latent"
@@ -200,6 +200,10 @@ class ThreeStageFit:
         set_grad_tracking(ae_diffusion.latent_sde.diffusion_net, False)
         set_grad_tracking(ae_diffusion.latent_sde.drift_net, True)
 
+        if ambient_drift_mse:
+            loss_space = "ambient"
+        else:
+            loss_space = "latent"
         print("Training latent infinitesimal drift via "+loss_space+" MSE...")
         fit_model(model=ae_diffusion,
                   loss=drift_loss,

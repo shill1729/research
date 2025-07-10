@@ -51,8 +51,13 @@ class FeedForwardNeuralNet(nn.Module):
 
     """
 
-    def __init__(self, neurons: List[int], activations: List[Optional[Callable[..., Any]]], spectral_normalize=False,
-                 weight_normalize=False, fro_normalize=False, fro_max_norm=5.):
+    def __init__(self,
+                 neurons: List[int],
+                 activations: List[Optional[Callable[..., Any]]],
+                 spectral_normalize=False,
+                 weight_normalize=False,
+                 fro_normalize=False,
+                 fro_max_norm=5.):
         """
         Initializes the FeedForwardNeuralNet with the given neurons and activation functions.
 

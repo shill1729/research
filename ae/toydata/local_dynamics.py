@@ -73,22 +73,30 @@ class RiemannianBrownianMotion(DynamicsBase):
 
 class LangevinHarmonicOscillator(DynamicsBase):
 
-    def __init__(self, temperature=1.):
+    def __init__(self, temperature=1., target_x=0., target_y=0.):
+        """
+
+        :param temperature:
+        :param target_x:
+        :param target_y:
+        """
         super().__init__()
         self.temperature = temperature
         self.inverse_temp = 1 / temperature
         self.volatility = 1.
+        self.target_x = target_x
+        self.target_y = target_y
 
     def drift(self, manifold: RiemannianManifold):
         # Define a potential based on the dimension
         if manifold.local_coordinates.shape[0] == 2:
             harmonic_potential = sp.Matrix([
-                self.u - 0.8,
-                self.v - 0.8
+                self.u - self.target_x,
+                self.v - self.target_y
             ])
         elif manifold.local_coordinates.shape[0] == 1:
             harmonic_potential = sp.Matrix([
-                self.u - 1.
+                self.u - self.target_x
             ])
         else:
             raise NotImplementedError("Only intrinsic dimensions 2 and 1 are implemented")

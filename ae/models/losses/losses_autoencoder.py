@@ -207,7 +207,9 @@ class TangentDriftAlignment2(nn.Module):
         # self.reconstruction_loss = nn.MSELoss()
 
     @staticmethod
-    def forward(encoder_jacobian, decoder_hessian, ambient_cov, ambient_drift, observed_normal_proj, decoder_jacobian):
+    def forward(encoder_jacobian, decoder_hessian, ambient_cov, ambient_drift, observed_normal_proj,
+                decoder_jacobian,
+                use_true_proj=True):
         """
             A regularization term to align the higher-order geometry of an autoencoder with an observed
         ambient drift. Specifically, the ambient drift minus the 2nd-order ito-correction term should be
@@ -222,21 +224,26 @@ class TangentDriftAlignment2(nn.Module):
         :param ambient_cov: tensor of shape (n, D, D)
         :param ambient_drift: tensor of shape (n, D)
         :param observed_normal_proj: tensor of shape (n, D, D)
+        :param decoder_jacobian: tensor of shape (n, D, d)
+        :param use_true_proj: boolean for whether to use the true orthogonal projection onto the normal space
+         or the oblique projection onto the model's normal space.
+
         :return: tensor of shape (1, ).
         """
         # Ito's lemma from D -> d gives a proxy to the local covariance using the Jacobian of the encoder
         bbt_proxy = torch.bmm(torch.bmm(encoder_jacobian, ambient_cov), encoder_jacobian.mT)
         # The QV correction from d -> D with the proxy-local cov: q^i = < bb^T, nabla^2 phi^i >_F
-        qv = ambient_quadratic_variation_drift(bbt_proxy, decoder_hessian)
+        q_hat = ambient_quadratic_variation_drift(bbt_proxy, decoder_hessian)
         # The ambient drift mu = Dphi a + 0.5 q should satisfy v := mu-0.5 q has N v = 0 since v = Dphi a is tangent
         # to the manifold
-        tangent_drift = ambient_drift - 0.5 * qv
-        # Compute N . (mu-0.5 q)
+        tangent_drift = ambient_drift - 0.5 * q_hat
+        # Compute N . (mu-0.5 hat q) or Q. (mu-0.5 hat q)
         # model_oblique_tangent_proj = torch.bmm(decoder_jacobian, encoder_jacobian)
         # n, d = model_oblique_tangent_proj.shape[0], model_oblique_tangent_proj.shape[1]
         # I = torch.eye(d, device=model_oblique_tangent_proj.device, dtype=model_oblique_tangent_proj.dtype).expand(n, -1, -1)
         # model_oblique_normal_proj = I-model_oblique_tangent_proj
-        # TODO: toggle betweeen 'observed_normal_proj' (unused as of now) and 'model_oblique_normal_proj'
+        # TODO: toggle betweeen 'observed_normal_proj' (unused as of now) and 'model_oblique_normal_proj' using
+        #  the above boolean 'use_true_proj'
         normal_projected_tangent_drift = torch.bmm(observed_normal_proj, tangent_drift.unsqueeze(2)).squeeze(2)
         # Return the mean of the norm squared
         norm_squared = torch.linalg.vector_norm(normal_projected_tangent_drift, ord=2, dim=1)**2

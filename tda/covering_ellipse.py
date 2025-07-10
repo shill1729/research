@@ -1,8 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.patches import Ellipse
-from tda.solvers.kfunction import get_A_operations_fast, compute_K_fast
-from tda.solvers.scipy_solver import minimize_K
+from tda.ellipsoidal.solvers.kfunction import get_A_operations_fast
+from tda.ellipsoidal.solvers.scipy_solver import minimize_K
 
 def plot_optimal_ellipse_and_centroid(xs, A_list, epsilon2, title, xlim=(-1, 3.5), ylim=(-1.5, 3)):
     # Convert to array

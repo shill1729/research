@@ -18,12 +18,12 @@ def ambient_quadratic_variation_drift(latent_covariance: Tensor, decoder_hessian
 class LatentNeuralSDE(nn.Module):
     def __init__(self,
                  intrinsic_dim: int,
-                 h1: List[int],
-                 h2: List[int],
+                 drift_layers: List[int],
+                 diff_layers: List[int],
                  drift_act: nn.Module,
                  diffusion_act: nn.Module,
                  encoder_act: Optional[nn.Module] = None,
-                 spectral_normalize=True,
+                 spectral_normalize=False,
                  weight_normalize=False,
                  fro_normalize=False,
                  fro_max_norm=1.,
@@ -42,8 +42,8 @@ class LatentNeuralSDE(nn.Module):
         """
         super().__init__(*args, **kwargs)
         self.intrinsic_dim = intrinsic_dim
-        neurons_mu = [intrinsic_dim] + h1 + [intrinsic_dim]
-        neurons_sigma = [intrinsic_dim] + h2 + [intrinsic_dim ** 2]
+        neurons_mu = [intrinsic_dim] + drift_layers + [intrinsic_dim]
+        neurons_sigma = [intrinsic_dim] + diff_layers + [intrinsic_dim ** 2]
         activations_mu = [drift_act for _ in range(len(neurons_mu) - 2)] + [encoder_act]
         activations_sigma = [diffusion_act for _ in range(len(neurons_sigma) - 2)] + [encoder_act]
         self.drift_net = FeedForwardNeuralNet(neurons_mu,

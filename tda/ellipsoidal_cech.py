@@ -1,6 +1,5 @@
-import numpy as np
 from itertools import combinations
-from tda.solvers.scipy_solver import minimize_K, ellipsoidal_intersection
+from tda.ellipsoidal.solvers.scipy_solver import ellipsoidal_intersection
 
 def build_ellipsoidal_cech(xs, A_list, eps, max_dim=2):
     """

@@ -1,7 +1,6 @@
 import numpy as np
 from scipy.optimize import minimize, LinearConstraint
-from tda.solvers.kfunction import compute_K_gradient_fast, compute_K_fast, compute_K_hessian_fast, get_A_operations_fast
-from tda.solvers.kfunction import compute_K, compute_K_gradient
+from tda.ellipsoidal.solvers.kfunction import compute_K_gradient_fast, compute_K_fast, compute_K_hessian_fast, get_A_operations_fast
 
 
 def minimize_K(eps, xs, A_array=None, solver="SLSQP"):
