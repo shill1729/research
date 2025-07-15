@@ -27,12 +27,12 @@ from ae.models.losses.losses_ambient import AmbientDriftLoss, AmbientCovarianceL
 # with Latent MSEs vs Ambient MSEs
 compare_mse = False
 # NOTE: These are only used when 'compare_mse=False'
-use_ambient_cov_mse = True
-use_ambient_drift_mse = True
+use_ambient_cov_mse = False
+use_ambient_drift_mse = False
 # NOTE: Toggle this to make all the autoencoders and all the SDEs use the same initial weights.
 use_same_initial_weights = False
 train_seed = None
-n_train = 50
+n_train = 100
 batch_size = int(n_train * 0.8)
 
 # Architecture parameters
@@ -67,7 +67,7 @@ diffusion_act = nn.Tanh()
 if __name__ == "__main__":
     # Pick the manifold and dynamics
     curve = ProductSurface()
-    dynamics = LangevinDoubleWell()
+    dynamics = RiemannianBrownianMotion()
     manifold = RiemannianManifold(curve.local_coords(), curve.equation())
     local_drift = dynamics.drift(manifold)
     local_diffusion = dynamics.diffusion(manifold)
@@ -89,33 +89,33 @@ if __name__ == "__main__":
         weight_configs = {
             # First order overwrite
             "vanilla": LossWeights(diffeomorphism_reg=diffeo_weight,
-                                   tangent_angle_weight=first_order_weight,
+                                   tangent_space_error_weight=first_order_weight,
                                    tangent_drift_weight=0.),
             # Second order overwrite. 'curve_full_assessment.py' handles the relabeling.
             "diffeo": LossWeights(diffeomorphism_reg=diffeo_weight,
-                                  tangent_angle_weight=first_order_weight,
+                                  tangent_space_error_weight=first_order_weight,
                                   tangent_drift_weight=second_order_weight),
             "first_order": LossWeights(diffeomorphism_reg=diffeo_weight,
-                                       tangent_angle_weight=first_order_weight,
+                                       tangent_space_error_weight=first_order_weight,
                                        tangent_drift_weight=0.),
             "second_order": LossWeights(diffeomorphism_reg=diffeo_weight,
-                                        tangent_angle_weight=first_order_weight,
+                                        tangent_space_error_weight=first_order_weight,
                                         tangent_drift_weight=second_order_weight)
         }
     else:
         # Otherwise we are doing ablation test for different penalties
         weight_configs = {
             "vanilla": LossWeights(diffeomorphism_reg=0.0,
-                                   tangent_angle_weight=0.0,
+                                   tangent_space_error_weight=0.0,
                                    tangent_drift_weight=0.0),
             "diffeo": LossWeights(diffeomorphism_reg=diffeo_weight,
-                                  tangent_angle_weight=0.0,
+                                  tangent_space_error_weight=0.0,
                                   tangent_drift_weight=0.0),
             "first_order": LossWeights(diffeomorphism_reg=diffeo_weight,
-                                       tangent_angle_weight=first_order_weight,
+                                       tangent_space_error_weight=first_order_weight,
                                        tangent_drift_weight=0.0),
             "second_order": LossWeights(diffeomorphism_reg=diffeo_weight,
-                                        tangent_angle_weight=first_order_weight,
+                                        tangent_space_error_weight=first_order_weight,
                                         tangent_drift_weight=second_order_weight)
         }
 

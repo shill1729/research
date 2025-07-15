@@ -183,14 +183,14 @@ class ArbitraryMotion(DynamicsBase):
     def drift(self, manifold=None):
         return sp.Matrix([
             -(self.u - 0.5),
-             (self.u - 0.5)
-        ]) / 4
+             (self.u - 0.5*self.v**2/10)
+        ]) / 2
 
     def diffusion(self, manifold=None):
         return sp.Matrix([
             [0.1 * sp.sin(self.u) + self.v ** 2, 0.05 * sp.cos(self.v) + self.u],
             [0.02 * self.u * self.v, 0.1 + 0.1 * self.v]
-        ]) / 20
+        ]) / 3
 
 
 class ArbitraryMotion2(DynamicsBase):

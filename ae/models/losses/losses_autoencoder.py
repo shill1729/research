@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-
+from typing import Union
 import torch
 import torch.nn as nn
 from torch import Tensor
@@ -126,7 +126,7 @@ class TangentBundleRegularization(nn.Module):
         projection
     """
 
-    def __init__(self, norm="fro", *args, **kwargs):
+    def __init__(self, norm:Union[str, int]="fro", *args, **kwargs):
         """
             A regularization term to train the autoencoder's orthogonal projection to approximate an observed
             orthogonal projection
@@ -310,7 +310,7 @@ class TotalLoss(nn.Module):
         self.reconstruction_loss = ReconstructionLoss()
         self.contractive_reg = ContractivePenalty(norm="fro")
         self.diffeomorphism_reg = DiffeomorphicRegularization(norm)
-        self.tangent_bundle_reg = TangentBundleRegularization(norm="fro")
+        self.tangent_bundle_reg = TangentBundleRegularization(norm=2)
         self.drift_alignment_reg = TangentDriftAlignment2()
         self.tangent_angles_reg = TangentSpaceAnglesLoss()
         self.device = device

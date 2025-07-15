@@ -165,7 +165,7 @@ class ProductSurface(SurfaceBase):
 
 
 class HyperbolicParaboloid(SurfaceBase):
-    def __init__(self, a=4, b=4):
+    def __init__(self, a=3, b=3):
         super().__init__()
         self.a = a
         self.b = b
@@ -175,7 +175,7 @@ class HyperbolicParaboloid(SurfaceBase):
         return sp.Matrix([self.u, self.v, fuv])
 
     def bounds(self):
-        return [(-2., 2.), (-2., 2.)]
+        return [(-1., 1.), (-1., 1.)]
 
 
 class SpherePatch(SurfaceBase):

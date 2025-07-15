@@ -21,11 +21,11 @@ from ae.examples.curves.curve_full_training import encoder_act, decoder_act, fin
 # Choose a base directory for saved models: either 'save_models' or a specific name
 # save_dir = "paraboloid_rotation_drift"
 # save_dir = "paraboloid_harmonic_drift"
+# save_dir = "product_rbm"
 save_dir = "saved_models"
-# TODO: change [0, eps_max] to [-eps_min, eps_max]
 
 # Number of test points in new sample
-n_test = 10000
+n_test = 20000
 num_grid = 100
 eps_min = -0.1
 eps_max = 0.5
@@ -195,7 +195,6 @@ groups = {
 }
 
 # TODO: refactor this into a plotting module
-# TODO: plot the vertical line demarcating the cross-over at v = -eps_min (since eps_min is negative)
 for group_name, keys in groups.items():
     # Special layout for Encoder/Decoder group
     if group_name == "Encoder/Decoder Conditioning":
