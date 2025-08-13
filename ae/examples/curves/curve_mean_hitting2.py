@@ -13,12 +13,13 @@ from ae.models import (
     AutoEncoder, LatentNeuralSDE, AutoEncoderDiffusion, ThreeStageFit, LossWeights,
 )
 
+TARGET_DIR = "/Users/seanhill/Documents/Typesetting/LaTex Notes/CandidacyExam/plots"
 # === Configuration ===
 intrinsic_dim = 1
 extrinsic_dim = 2
-hidden_dims = [32]
-drift_layers = [32]
-diff_layers = [32]
+hidden_dims = [32, 32]
+drift_layers = [16, 16]
+diff_layers = [16, 16]
 lr = 0.001
 weight_decay = 0.
 batch_size = 25
@@ -33,11 +34,11 @@ tn = 1.
 ntime = 1000
 npaths = 1000
 # Penalties
-tangent_angle_weight = 0.05
-tangent_drift_weight = 0.02
+tangent_angle_weight = 0.04
+tangent_drift_weight = 0.01
 diffeo_weight = 0.2
-bd = 0.5
-hit_radius = 0.01
+bd = 1.0
+hit_radius = 0.011
 # Time grid
 time_grid = np.linspace(0, tn, ntime+1)
 
@@ -62,13 +63,13 @@ ae_vanilla = AutoEncoder(extrinsic_dim, intrinsic_dim, hidden_dims, encoder_act,
 latent_sde_vanilla = LatentNeuralSDE(intrinsic_dim, drift_layers, diff_layers, drift_act, diffusion_act)
 aedf_vanilla = AutoEncoderDiffusion(latent_sde_vanilla, ae_vanilla)
 weights_zero = LossWeights(
-    tangent_angle_weight=tangent_angle_weight,
+    tangent_angle_weight=0.,
     tangent_drift_weight=0.,
-    diffeomorphism_reg=diffeo_weight
+    diffeomorphism_reg=0.
 )
 
 fit3 = ThreeStageFit(lr, epochs_ae, epochs_diffusion, epochs_drift, weight_decay, batch_size, print_freq)
-print("Training 1st order AE")
+print("Training vanilla  AE")
 fit3.three_stage_fit(aedf_vanilla, weights_zero, x, mu, cov, p, h)
 
 # === AE-SDE Penalized ===
@@ -184,7 +185,7 @@ def summarize(hit_times, mask):
 
 stats = {
     "GT":        summarize(gt_hit, gt_mask),
-    "First Order":   summarize(van_hit, van_mask),
+    "Vanilla":   summarize(van_hit, van_mask),
     "Second Order": summarize(pen_hit, pen_mask),
 }
 
@@ -225,7 +226,7 @@ def plot_kde(times, mask, label, color):
                     label=f"{label} (single hit)")
 
 plot_kde(gt_hit,      gt_mask,  "Ground Truth",    "green")
-plot_kde(van_hit,     van_mask, "First Order AE-SDE",  "red")
+plot_kde(van_hit,     van_mask, "Vanilla AE-SDE",  "red")
 plot_kde(pen_hit,     pen_mask, "Second Order AE-SDE","blue")
 
 ax2.set_title("KDE of First Hitting Times")
@@ -233,5 +234,6 @@ ax2.set_xlabel("Hitting Time");  ax2.set_ylabel("Density")
 ax2.legend()
 ax2.grid(linestyle="--", alpha=0.6)
 plt.tight_layout()
-plt.savefig("curve_plots/hitting_time_kde_comparison_bellcurve5.png")
+plt.savefig("curve_plots/hitting_time_kde_comparison_cubiccurve9.png")
+plt.savefig("/Users/seanhill/Documents/Typesetting/LaTex Notes/CandidacyExam/plots/Cubic/hitting_time_kde2.png")
 plt.show()

@@ -32,6 +32,7 @@ class AutoEncoder(nn.Module):
                  weight_normalize: bool = False,
                  fro_normalize: bool = False,
                  fro_max_norm: float = 5.,
+                 tie_weights=False,
                  *args,
                  **kwargs):
         """
@@ -62,10 +63,13 @@ class AutoEncoder(nn.Module):
         # The decoder has no final activation, so it can target anything in the ambient space
         decoder_acts = [decoder_act] * len(hidden_dims) + [None]
         # TODO pass the normalization options
-        self.encoder = FeedForwardNeuralNet(encoder_neurons, encoder_acts, spectral_normalize=False)
-        self.decoder = FeedForwardNeuralNet(decoder_neurons, decoder_acts, spectral_normalize=False)
-        # Tie the weights of the decoder to be the transpose of the encoder, in reverse due
-        self.decoder.tie_weights(self.encoder)
+        self.encoder = FeedForwardNeuralNet(encoder_neurons, encoder_acts, spectral_normalize=spectral_normalize)
+        self.decoder = FeedForwardNeuralNet(decoder_neurons, decoder_acts, spectral_normalize=spectral_normalize)
+
+        # Tie the weights of the decoder to be the transpose of the encoder, in reverse order
+        self.weights_tied = tie_weights
+        if self.weights_tied:
+            self.decoder.tie_weights(self.encoder)
 
     def forward(self, x: Tensor) -> Tensor:
         """
@@ -75,8 +79,8 @@ class AutoEncoder(nn.Module):
         :return: the reconstructed point cloud x_hat of shape
                  (batch_size, extrinsic_dim)
         """
-        z = self.encoder(x)
-        x_hat = self.decoder(z)
+        z = self.encoder.forward(x)
+        x_hat = self.decoder.forward(z)
         return x_hat
 
     def encoder_jacobian(self, x: Tensor) -> Tensor:

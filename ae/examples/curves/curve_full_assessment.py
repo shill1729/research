@@ -14,7 +14,7 @@ from ae.models.sdes_latent import ambient_quadratic_variation_drift
 from ae.toydata import RiemannianManifold, PointCloud
 from ae.utils import process_data
 from ae.experiment_classes.errors.ae_errors import compute_all_losses_for_model
-from ae.examples.curves.curve_full_training import compare_mse, intrinsic_dim
+from ae.examples.curves.curve_full_training import compare_mse
 from ae.examples.curves.curve_full_training import encoder_act, decoder_act, final_act, drift_act, diffusion_act
 
 # NOTE:
@@ -230,6 +230,7 @@ if intrinsic_dim == 1:
 elif intrinsic_dim == 2:
     phi_u, u_grid = point_cloud_shell.get_surface(num_grid=num_grid)
     phi_u_tensor = torch.tensor(phi_u.reshape(-1, phi_u.shape[-1]), dtype=torch.float32, device=device)
+    print(phi_u_tensor.size())
 else:
     raise NotImplementedError("Only 1D and 2D manifolds are currently supported.")
 

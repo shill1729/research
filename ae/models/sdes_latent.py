@@ -142,7 +142,7 @@ class AutoEncoderDiffusion(nn.Module):
         return lifted_ensemble
 
     def compute_sde_manifold_tensors(self, x: Tensor, cov=None):
-        z = self.autoencoder.encoder.forward(x)
+        z = self.autoencoder.encoder(x)
         dphi = self.autoencoder.decoder_jacobian(z)
         latent_diffusion = self.latent_sde.diffusion(z)
         if cov is None:
@@ -155,13 +155,13 @@ class AutoEncoderDiffusion(nn.Module):
         return z, dphi, latent_diffusion, q
 
     def compute_local_covariance(self, x: Tensor):
-        z = self.autoencoder.encoder.forward(x)
+        z = self.autoencoder.encoder(x)
         local_diffusion = self.latent_sde.diffusion(z)
         local_covariance = torch.bmm(local_diffusion, local_diffusion.mT)
         return local_covariance
 
     def compute_local_drift(self, x: Tensor):
-        z = self.autoencoder.encoder.forward(x)
+        z = self.autoencoder.encoder(x)
         local_drift = self.latent_sde.drift_net(z)
         return local_drift
 

@@ -21,41 +21,43 @@ from ae.models import AutoEncoder, LatentNeuralSDE, AutoEncoderDiffusion, fit_mo
 from ae.models import LossWeights, AmbientDriftNetwork, AmbientDiffusionNetwork
 from ae.models.losses.losses_ambient import AmbientDriftLoss, AmbientCovarianceLoss
 # TODO: embed into higher dimension
+# TODO: we are currently using the 2-norm for the Tangent Bundle error!
+# TODO: Check contractive errors
 
 # Model configuration parameters
 # Set 'compare_mse' to True when you want to compare 1st and 2nd order models being trained
 # with Latent MSEs vs Ambient MSEs
-compare_mse = False
+compare_mse = False # TODO: currently tests tangent penalty approx vs true tangent penalty
 # NOTE: These are only used when 'compare_mse=False'
 use_ambient_cov_mse = False
 use_ambient_drift_mse = False
 # NOTE: Toggle this to make all the autoencoders and all the SDEs use the same initial weights.
-use_same_initial_weights = False
+use_same_initial_weights = True
 train_seed = None
-n_train = 100
+n_train = 50
 batch_size = int(n_train * 0.8)
 
 # Architecture parameters
-intrinsic_dim = 2
-extrinsic_dim = 3
-hidden_dims = [64, 64]
-diff_layers = [64, 64]
-drift_layers = [64, 64]
+intrinsic_dim = 1
+extrinsic_dim = 2
+hidden_dims = [16]
+diff_layers = [2]
+drift_layers = [2]
 
 
 # Training parameters
 lr = 0.001
 weight_decay = 0.
 epochs_ae = 9000
-epochs_diffusion = 9000
-epochs_drift = 9000
+epochs_diffusion = 1000
+epochs_drift = 1000
 print_freq = 1000
 
 # Penalty weights
 #: 1., 0.001, 0.001/0.002 worked well for paraboloid on many dynamics
-diffeo_weight = 1.
-first_order_weight = 0.002
-second_order_weight = 0.002
+diffeo_weight = 0.01
+first_order_weight = 0.01
+second_order_weight = 0.01
 
 # Activation functions
 encoder_act = nn.Tanh()
@@ -66,7 +68,7 @@ diffusion_act = nn.Tanh()
 
 if __name__ == "__main__":
     # Pick the manifold and dynamics
-    curve = ProductSurface()
+    curve = Parabola()
     dynamics = RiemannianBrownianMotion()
     manifold = RiemannianManifold(curve.local_coords(), curve.equation())
     local_drift = dynamics.drift(manifold)
@@ -89,17 +91,17 @@ if __name__ == "__main__":
         weight_configs = {
             # First order overwrite
             "vanilla": LossWeights(diffeomorphism_reg=diffeo_weight,
-                                   tangent_space_error_weight=first_order_weight,
+                                   tangent_angle_weight=first_order_weight,
                                    tangent_drift_weight=0.),
             # Second order overwrite. 'curve_full_assessment.py' handles the relabeling.
             "diffeo": LossWeights(diffeomorphism_reg=diffeo_weight,
-                                  tangent_space_error_weight=first_order_weight,
+                                  tangent_angle_weight=first_order_weight,
                                   tangent_drift_weight=second_order_weight),
             "first_order": LossWeights(diffeomorphism_reg=diffeo_weight,
-                                       tangent_space_error_weight=first_order_weight,
+                                       tangent_approx_weight=first_order_weight,
                                        tangent_drift_weight=0.),
             "second_order": LossWeights(diffeomorphism_reg=diffeo_weight,
-                                        tangent_space_error_weight=first_order_weight,
+                                        tangent_approx_weight=first_order_weight,
                                         tangent_drift_weight=second_order_weight)
         }
     else:

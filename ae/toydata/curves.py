@@ -202,6 +202,73 @@ class Circle(CurveBase):
     def bounds(self):
         return [(0, 2*np.pi)]
 
+
+class ArctangentCurve(CurveBase):
+    def __init__(self, a=1.0):
+        super().__init__()
+        self.a = a
+
+    def equation(self):
+        return sp.Matrix([self.u, sp.atan(self.a * self.u)])
+
+    def bounds(self):
+        return [(-1.5, 1.5)]
+
+
+class SigmoidCurve(CurveBase):
+    def __init__(self, a=1.0):
+        super().__init__()
+        self.a = a
+
+    def equation(self):
+        return sp.Matrix([self.u, 1 / (1 + sp.exp(-self.a * self.u))])
+
+    def bounds(self):
+        return [(-1.5, 1.5)]
+
+
+class TanhCurve(CurveBase):
+    def __init__(self, a=1.0):
+        super().__init__()
+        self.a = a
+
+    def equation(self):
+        return sp.Matrix([self.u, sp.tanh(self.a * self.u)])
+
+    def bounds(self):
+        return [(-1.5, 1.5)]
+
+
+class BumpFunctionCurve(CurveBase):
+    def __init__(self, a=1.0):
+        super().__init__()
+        self.a = a  # controls width
+
+    def equation(self):
+        expr = sp.Piecewise(
+            (sp.exp(-1 / (1 - (self.u / self.a)**2)), abs(self.u) < self.a),
+            (0, True)
+        )
+        return sp.Matrix([self.u, expr])
+
+    def bounds(self):
+        return [(-self.a * 1.5, self.a * 1.5)]
+
+
+class GaussianModulatedSineCurve(CurveBase):
+    def __init__(self, amplitude=1.0, frequency=5.0, sigma=1.0):
+        super().__init__()
+        self.amplitude = amplitude
+        self.frequency = frequency
+        self.sigma = sigma
+
+    def equation(self):
+        y = self.amplitude * sp.exp(-(self.u**2) / (2 * self.sigma**2)) * sp.sin(self.frequency * self.u)
+        return sp.Matrix([self.u, y])
+
+    def bounds(self):
+        return [(-1.5, 1.5)]
+
 # Example of usage
 if __name__ == "__main__":
     curves = [
