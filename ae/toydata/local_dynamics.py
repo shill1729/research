@@ -73,7 +73,7 @@ class RiemannianBrownianMotion(DynamicsBase):
 
 class LangevinHarmonicOscillator(DynamicsBase):
 
-    def __init__(self, temperature=1., target_x=0., target_y=0.):
+    def __init__(self, temperature=1., target_x=0.9, target_y=0.):
         """
 
         :param temperature:

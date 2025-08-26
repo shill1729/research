@@ -30,7 +30,7 @@ compare_mse = False
 use_ambient_cov_mse = False
 use_ambient_drift_mse = False
 # NOTE: Toggle this to make all the autoencoders and all the SDEs use the same initial weights.
-use_same_initial_weights = False
+use_same_initial_weights = True
 # Do you want to tie the autoencoder weights?
 tie_weights = True
 train_seed = None
@@ -40,24 +40,24 @@ batch_size = int(n_train * 0.5)
 # Architecture parameters
 intrinsic_dim = 2
 extrinsic_dim = 3
-hidden_dims = [32, 32]
-diff_layers = [32, 32]
-drift_layers = [32, 32]
+hidden_dims = [16, 16]
+diff_layers = [16, 16]
+drift_layers = [16, 16]
 
 
 # Training parameters
 lr = 0.0005
 weight_decay = 0.
-epochs_ae = 15000
-epochs_diffusion = 15000
-epochs_drift = 15000
+epochs_ae = 9000
+epochs_diffusion = 9000
+epochs_drift = 9000
 print_freq = 1000
 
 # Penalty weights
 #: 1., 0.001, 0.001/0.002 worked well for paraboloid on many dynamics
 diffeo_weight = 0.05
-first_order_weight = 0.005
-second_order_weight = 0.005
+first_order_weight = 0.001
+second_order_weight = 0.001
 
 # Activation functions
 encoder_act = nn.Tanh()
@@ -83,8 +83,8 @@ diffusion_act = nn.Tanh()
 curve_list = [
     # Paraboloid()
     ProductSurface(),
-    RationalSurface(),
-    DeepParaboloid()
+    # RationalSurface(),
+    # DeepParaboloid()
 
 ]
 
@@ -133,7 +133,7 @@ else:
 
 if __name__ == "__main__":
 
-
+    # Pick dynamics here:
     dynamics = ArbitraryMotion2()
 
     for curve in curve_list:
@@ -188,7 +188,7 @@ if __name__ == "__main__":
 
             if use_same_initial_weights:
                 aedf.load_state_dict(copy.deepcopy(aedf_ref.state_dict()))
-
+            # Fit the 3-stage model
             fit3.three_stage_fit(aedf, weights, x, mu, cov, p, h,
                                  ambient_cov_mse=use_ambient_cov_mse,
                                  ambient_drift_mse=use_ambient_drift_mse)

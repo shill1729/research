@@ -20,13 +20,13 @@ num_test = 20000
 
 # Sample path properties
 h = 0.001
-n_paths = 100
+n_paths = 250
 # Define a list of time horizons to test
-time_horizons = [0.25]
+time_horizons = [0.5]
 
 
 # Load the pre-trained model: note working directory is currently ae/experiment_classes
-model_dir = "examples/surfaces/trained_models/Paraboloid/RiemannianBrownianMotion/trained_20250624-232728_h[16, 16, 16]_df[16, 16]_dr[16, 16]_lr0.001_epochs15000_not_annealed"
+model_dir = "examples/surfaces/trained_models/ProductSurface/RiemannianBrownianMotion/trained_20250820-170956_h[32, 32]_df[16, 16]_dr[16, 16]_lr0.001_epochs9000_not_annealed"
 trainer = Trainer.load_from_pretrained(model_dir, device=device, large_dim=large_dim)
 trainer.models = {name:model.to(device) for name, model in trainer.models.items()}
 trainer.ambient_drift.to(device)

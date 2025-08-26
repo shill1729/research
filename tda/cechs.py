@@ -2,7 +2,7 @@ from matplotlib import pyplot as plt
 
 from tda.ellipsoidal.complexes.complexes import EllipsoidalVR, EllipsoidalCech
 from tda.ellipsoidal.plotting.plotting import plot_point_cloud, plot_simplices
-from tda.toydata.toydata import generate_curve_point_cloud_and_ellipses
+from tda.toydata.toydata import generate_toy_data
 
 
 def build_and_plot_all(xs, A_list, curve, epsilons):
@@ -36,7 +36,9 @@ def build_and_plot_all(xs, A_list, curve, epsilons):
 
 
 if __name__ == '__main__':
-    xs, A_list, point_cloud = generate_curve_point_cloud_and_ellipses(n=3)
+    from ae.toydata.curves import Parabola
+    curve = Parabola()
+    xs, A_list, point_cloud = generate_toy_data(n=3, surface_or_curve=curve)
     curve, _ = point_cloud.get_curve(50)
     # epsilons = [0.8, 1.25]
     epsilons = [0.1, 0.5]

@@ -434,3 +434,5 @@ for key in model_keys:
     fig.suptitle(f"Spectral Scatter Plot: {display_name_map[key]}")
     plt.tight_layout()
     plt.show()
+
+# TODO: add sample path monte-carlo analysis.

@@ -34,11 +34,11 @@ tn = 1.
 ntime = 1000
 npaths = 1000
 # Penalties
-tangent_angle_weight = 0.04
+tangent_angle_weight = 0.01
 tangent_drift_weight = 0.01
 diffeo_weight = 0.2
 bd = 1.0
-hit_radius = 0.011
+hit_radius = 0.00225
 # Time grid
 time_grid = np.linspace(0, tn, ntime+1)
 
@@ -50,7 +50,7 @@ diffusion_act = nn.Tanh()
 
 # === Data Generation ===
 curve = Cubic()
-dynamics = RiemannianBrownianMotion()
+dynamics = LangevinHarmonicOscillator()
 manifold = RiemannianManifold(curve.local_coords(), curve.equation())
 local_drift = dynamics.drift(manifold)
 local_diffusion = dynamics.diffusion(manifold)
@@ -59,7 +59,7 @@ x, _, mu, cov, local_x = point_cloud.generate(n=n_train)
 x, mu, cov, p, n, h = process_data(x, mu, cov, d=intrinsic_dim)
 
 # === AE-SDE Vanilla (zero regularization) ===
-ae_vanilla = AutoEncoder(extrinsic_dim, intrinsic_dim, hidden_dims, encoder_act, decoder_act)
+ae_vanilla = AutoEncoder(extrinsic_dim, intrinsic_dim, hidden_dims, encoder_act, decoder_act, final_act=encoder_act)
 latent_sde_vanilla = LatentNeuralSDE(intrinsic_dim, drift_layers, diff_layers, drift_act, diffusion_act)
 aedf_vanilla = AutoEncoderDiffusion(latent_sde_vanilla, ae_vanilla)
 weights_zero = LossWeights(

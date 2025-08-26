@@ -29,23 +29,23 @@ if __name__ == "__main__":
     batch_size = int(num_points/2)
     # The intrinsic and extrinsic dimensions.
     extrinsic_dim, intrinsic_dim = 3, 2
-    hidden_dims = [16, 16, 16]
+    hidden_dims = [32, 32]
     diffusion_layers = [16, 16]
     drift_layers = [16, 16]
     lr = 0.001
     weight_decay = 0.
-    epochs_ae = 15000
-    epochs_diffusion = 15000
-    epochs_drift = 15000
+    epochs_ae = 9000
+    epochs_diffusion = 9000
+    epochs_drift = 9000
     print_freq = 1000
     # Diffeo weight for accumulative orders
     diffeo_weight_12 = 0.1 # this is the separate diffeo_weight for just the First order and second order
     # First order weight: 0.08 was good
-    tangent_angle_weight = 0.01
+    tangent_angle_weight = 0.001
     # Second order weights accumulative
-    tangent_angle_weight2 = 0.1 # the first order weight for the second order model, if accumulating penalties
-    tangent_drift_weight = 0.1
-    surface = Paraboloid()
+    tangent_angle_weight2 = 0.001 # the first order weight for the second order model, if accumulating penalties
+    tangent_drift_weight = 0.001
+    surface = ProductSurface()
     dynamics = RiemannianBrownianMotion()
     if embed:
         extrinsic_dim = large_dim

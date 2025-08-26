@@ -10,7 +10,7 @@ from tda.ellipsoidal.plotting.plotting import plot_simplices, plot_point_cloud, 
 # ---------------------------------------------------------------------------
 #  One-stop demo
 # ---------------------------------------------------------------------------
-def demo(surface_or_curve, n_pts=10, radii=np.linspace(0.01, 10.0, 25), max_dim=2):
+def demo(surface_or_curve, n_pts=3, radii=np.linspace(0.01, 10.0, 25), max_dim=2):
     # toy data
     xs, A_list, pc = generate_toy_data(n=n_pts, surface_or_curve=surface_or_curve)
     if pc.target_dim == 2:

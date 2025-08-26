@@ -21,7 +21,7 @@ def compute_test_losses(ae_diffusion: AutoEncoderDiffusion,
     x_test_recon = ae.decoder(ae.encoder(x_test))
 
     # Compute test reconstruction error
-    reconstruction_loss_test = torch.sqrt(ae_loss.reconstruction_loss.forward(x_test_recon, x_test)).item()
+    reconstruction_loss_test = torch.sqrt(ae_loss.reconstruction_loss(x_test_recon, x_test)).item()
 
     # Compute Jacobians and Hessians
     decoder_jacobian_test = ae.decoder_jacobian(ae.encoder(x_test))
@@ -34,16 +34,22 @@ def compute_test_losses(ae_diffusion: AutoEncoderDiffusion,
     # Neural metric tensor
     metric_tensor_test = torch.bmm(decoder_jacobian_test.mT, decoder_jacobian_test)
     # Tangent error
-    tangent_bundle_loss_test = ae_loss.tangent_bundle_reg.forward(decoder_jacobian_test,
-                                                                  metric_tensor_test,
-                                                                  p_test).item()
-    # Drift alignment regularization
-    drift_alignment_loss_test = ae_loss.drift_alignment_reg.forward(encoder_jacobian_test,
+    tangent_bundle_loss_test = ae_loss.tangent_bundle_reg(decoder_jacobian_test,
+                                                          metric_tensor_test,
+                                                          p_test).item()
+    # Drift alignment regularization: old syntax
+    # drift_alignment_loss_test = ae_loss.drift_alignment_reg.forward(encoder_jacobian_test,
+    #                                                                 decoder_hessian_test,
+    #                                                                 cov_test,
+    #                                                                 mu_test,
+    #                                                                 normal_proj_test,
+    #                                                                 decoder_jacobian_test).item()
+    # Drift alignment regularization: new syntax
+    drift_alignment_loss_test = ae_loss.drift_alignment_reg(encoder_jacobian_test,
                                                                     decoder_hessian_test,
                                                                     cov_test,
                                                                     mu_test,
-                                                                    normal_proj_test,
-                                                                    decoder_jacobian_test).item()
+                                                                    frame_test).item()
 
     # Diffeomorphism regularization 1
     diffeomorphism_loss_test = ae_loss.diffeomorphism_reg(decoder_jacobian_test, encoder_jacobian_test).item()

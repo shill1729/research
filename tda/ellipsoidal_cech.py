@@ -1,5 +1,7 @@
 from itertools import combinations
 from tda.ellipsoidal.solvers.scipy_solver import ellipsoidal_intersection
+from tda.toydata.toydata import generate_toy_data
+
 
 def build_ellipsoidal_cech(xs, A_list, eps, max_dim=2):
     """
@@ -50,6 +52,7 @@ def build_ellipsoidal_cech(xs, A_list, eps, max_dim=2):
 
 # Example usage:
 if __name__ == "__main__":
+    from ae.toydata.curves import Parabola
     # TODO: use our synthetic data
     # load or generate your data:
     # xs is (n, D) array of points
@@ -59,7 +62,8 @@ if __name__ == "__main__":
     #
     # e.g.:
     # TODO: generate points
-    xs, A_list = generate_point_cloud_and_pd_matrices()
+    curve = Parabola()
+    xs, A_list, point_cloud = generate_toy_data(n=3, surface_or_curve=curve)
     eps = 0.5
     max_dim = 3
 

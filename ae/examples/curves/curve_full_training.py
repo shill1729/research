@@ -38,26 +38,26 @@ n_train = 50
 batch_size = int(n_train * 0.8)
 
 # Architecture parameters
-intrinsic_dim = 1
-extrinsic_dim = 2
-hidden_dims = [16]
-diff_layers = [2]
-drift_layers = [2]
+intrinsic_dim = 2
+extrinsic_dim = 3
+hidden_dims = [16, 16]
+diff_layers = [16, 16]
+drift_layers = [16, 16]
 
 
 # Training parameters
 lr = 0.001
 weight_decay = 0.
 epochs_ae = 9000
-epochs_diffusion = 1000
-epochs_drift = 1000
+epochs_diffusion = 9000
+epochs_drift = 9000
 print_freq = 1000
 
 # Penalty weights
 #: 1., 0.001, 0.001/0.002 worked well for paraboloid on many dynamics
-diffeo_weight = 0.01
-first_order_weight = 0.01
-second_order_weight = 0.01
+diffeo_weight = 1.
+first_order_weight = 0.001
+second_order_weight = 0.002
 
 # Activation functions
 encoder_act = nn.Tanh()
@@ -68,7 +68,7 @@ diffusion_act = nn.Tanh()
 
 if __name__ == "__main__":
     # Pick the manifold and dynamics
-    curve = Parabola()
+    curve = ProductSurface()
     dynamics = RiemannianBrownianMotion()
     manifold = RiemannianManifold(curve.local_coords(), curve.equation())
     local_drift = dynamics.drift(manifold)
@@ -136,8 +136,10 @@ if __name__ == "__main__":
     for name, weights in weight_configs.items():
         print(f"Training AE-SDE model with {name} weights")
 
-        ae = AutoEncoder(extrinsic_dim, intrinsic_dim, hidden_dims, encoder_act, decoder_act)
-        latent_sde = LatentNeuralSDE(intrinsic_dim, drift_layers, diff_layers, drift_act, diffusion_act)
+        ae = AutoEncoder(extrinsic_dim, intrinsic_dim, hidden_dims, encoder_act, decoder_act,
+                         final_act=final_act)
+        latent_sde = LatentNeuralSDE(intrinsic_dim, drift_layers, diff_layers, drift_act, diffusion_act,
+                                     encoder_act=final_act)
         aedf = AutoEncoderDiffusion(latent_sde, ae)
         if use_same_initial_weights:
             aedf.load_state_dict(copy.deepcopy(aedf_ref.state_dict()))

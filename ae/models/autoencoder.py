@@ -32,7 +32,7 @@ class AutoEncoder(nn.Module):
                  weight_normalize: bool = False,
                  fro_normalize: bool = False,
                  fro_max_norm: float = 5.,
-                 tie_weights=False,
+                 tie_weights=True,
                  *args,
                  **kwargs):
         """

@@ -43,7 +43,7 @@ class Trainer:
 
         self.models = {}
         for model_type in ["vanilla", "first", "second"]:
-            ae = AutoEncoder(extrinsic_dim, intrinsic_dim, hidden_dims, self.encoder_act, self.decoder_act)
+            ae = AutoEncoder(extrinsic_dim, intrinsic_dim, hidden_dims, self.encoder_act, self.decoder_act, final_act=self.encoder_act)
             latent_sde = LatentNeuralSDE(intrinsic_dim, drift_layers, diffusion_layers, self.drift_act, self.diffusion_act,
                                          self.encoder_act)
             self.models[model_type] = AutoEncoderDiffusion(latent_sde, ae)
@@ -55,9 +55,8 @@ class Trainer:
                                           tangent_angle_weight=self.params["tangent_angle_weight"])
         weights_second_order = LossWeights(diffeomorphism_reg=self.params["diffeo_weight"],
                                            tangent_angle_weight=self.params["tangent_angle_weight2"],
-                                           tangent_drift_weight=self.params["tangent_drift_weight"],
-                                           encoder_contraction_weight=0.,
-                                           decoder_contraction_weight=0.001)
+                                           tangent_drift_weight=self.params["tangent_drift_weight"]
+                                           )
         print("Second order model")
         print(weights_second_order)
         self.ae_loss_weights = {
