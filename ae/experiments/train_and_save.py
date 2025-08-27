@@ -21,42 +21,42 @@ from ae.models.losses.losses_ambient import AmbientDriftLoss, AmbientCovarianceL
 
 
 # Model configuration parameters
+embed_data = False
 # Set 'compare_mse' to True when you want to compare 1st and 2nd order models being trained
 # with Latent MSEs vs Ambient MSEs
-embed_data = True
-compare_mse = False # TODO: currently tests tangent penalty approx vs true tangent penalty
+compare_mse = False
 # NOTE: These are only used when 'compare_mse=False'
-use_ambient_cov_mse = False
-use_ambient_drift_mse = False
+use_ambient_cov_mse = True
+use_ambient_drift_mse = True
 # NOTE: Toggle this to make all the autoencoders and all the SDEs use the same initial weights.
-use_same_initial_weights = False
-train_seed = None
+use_same_initial_weights = True
+train_seed = 17
 n_train = 50
 batch_size = int(n_train * 0.8)
 
 # Architecture parameters
-embedding_dim = 5
+embedding_dim = 10
 embedding_seed = 17
 intrinsic_dim = 2
 extrinsic_dim = 3
-hidden_dims = [16, 16]
-diff_layers = [16]
-drift_layers = [16]
+hidden_dims = [16]
+diff_layers = [8]
+drift_layers = [8]
 
 
 # Training parameters
 lr = 0.001
 weight_decay = 0.
-epochs_ae = 9000
-epochs_diffusion = 9000
-epochs_drift = 9000
+epochs_ae = 2000
+epochs_diffusion = 2
+epochs_drift = 2
 print_freq = 1000
 
 # Penalty weights
 #: 1., 0.001, 0.001/0.002 worked well for paraboloid on many dynamics
-diffeo_weight = 0.02
-first_order_weight = 0.01
-second_order_weight = 0.005
+diffeo_weight = 0.01
+first_order_weight = 0.001
+second_order_weight = 0.001
 
 # Activation functions
 encoder_act = nn.Tanh()
@@ -72,8 +72,8 @@ embedding_matrix, _ = torch.linalg.qr(embedding_matrix)
 
 if __name__ == "__main__":
     # Pick the manifold and dynamics
-    curve = SpherePatch()
-    dynamics = LangevinHarmonicOscillator()
+    curve = Paraboloid()
+    dynamics = RiemannianBrownianMotion()
     manifold = RiemannianManifold(curve.local_coords(), curve.equation())
     local_drift = dynamics.drift(manifold)
     local_diffusion = dynamics.diffusion(manifold)
@@ -96,6 +96,8 @@ if __name__ == "__main__":
     if compare_mse:
         # If we are comparing latent vs ambient MSE, use only first and second order
         print("Comparing latent MSE vs ambient MSE")
+        # TODO: currently this has been
+        #  overwritten to compare true tangent penalty to approx
         weight_configs = {
             # First order overwrite
             "vanilla": LossWeights(diffeomorphism_reg=diffeo_weight,
