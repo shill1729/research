@@ -29,7 +29,7 @@ class TotalLoss(nn.Module):
         self.reconstruction_loss = ReconstructionLoss()
         self.contractive_reg = ContractivePenalty(norm="fro")
         self.diffeomorphism_reg = DiffeomorphicRegularization(norm)
-        self.tangent_bundle_reg = TangentBundleRegularization(norm=2)
+        self.tangent_bundle_reg = TangentBundleRegularization(norm="fro")
         self.drift_alignment_reg = NormalDriftPenalty()
         self.tangent_angles_reg = TangentSpaceAnglesLoss()
         self.tangent_approx_reg = TangentBundleApproxPenalty()

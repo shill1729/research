@@ -172,6 +172,16 @@ def select_device(preferred_device=None):
     return device
 
 
+def embed_data_with_qr_matrix(x, mu, cov, p, n, h, embedding_matrix):
+    # Embed every object
+    x_embed = x @ embedding_matrix.T
+    mu_embed = mu @ embedding_matrix.T
+    cov_embed = embedding_matrix @ cov @ embedding_matrix.T
+    p_embed = embedding_matrix @ p @ embedding_matrix.T
+    n_embed = embedding_matrix @ n @ embedding_matrix.T
+    h_embed = torch.einsum("ij,njk->nik", embedding_matrix, h)
+    return x_embed, mu_embed, cov_embed, p_embed, n_embed, h_embed
+
 if __name__ == "__main__":
     # usage examples
     d = select_device("cuda")  # tries to use cuda

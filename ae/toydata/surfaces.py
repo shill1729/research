@@ -183,7 +183,7 @@ class SpherePatch(SurfaceBase):
         return sp.Matrix([
             self.u,
             self.v,
-            sp.sqrt(1 - self.u ** 2 - self.v ** 2)
+            1 - self.u ** 2 - self.v ** 2
         ])
 
     def bounds(self):
